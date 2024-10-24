@@ -71,32 +71,41 @@ As the communication is time-critical, a mismatched CRC will simply lead to the 
 This is probably the most common frame class.
 Frames in this class describe frames that are used in the cyclic communication part of sondbus.
 
+> [!NOTE]
+>
+> The first byte in the data section takes a special role for cyclic frames in that it contains the sequence number of the cycle.
+
 ### 0x10 Cyclic request
 
 This frame is sent by the master and initiates a new cycle.
-The payload is the sequence the master asks the slaves to respond.
+
+The payload is the sequence the master asks the slaves to respond,
+where the first byte is the sequence number of the cycle.
 
 Each slave stores its position in this queue and responds once it is its turn.
 
 ### 0x11 Cyclic response
 
-The response to the [cyclic request](#0x10-cyclic-request).
-The slave inserts the agreed-upon data into the data area of the frame and sends it.
+A possible response to the [cyclic request](#0x10-cyclic-request).
+
+The slave inserts the agreed-upon data into the data area of the frame and sends it, reserving the first byte in the response for the sequence number of the cycle that it responds to.
 
 ### 0x12 Cyclic skip
 
-An alternative response to the [cyclic request](#0x10-cyclic-request).
+A possible response to the [cyclic request](#0x10-cyclic-request).
 
-The slave skips this cycle due to internal reasons.
+The slave skips this cycle due to internal reasons, inserting the sequence number of the cycle as the first and only byte into the data section.
 
 This response contributes 1 to the slave's fail counter, counting as if it timed out.
 
 ### 0x13 Cyclic abort
 
-An alternative response to the [cyclic request](#0x10-cyclic-request).
+A possible response to the [cyclic request](#0x10-cyclic-request).
 
-The slave actively refuses to respond to the cyclic request and aborts the cycle.
-All further communication will not happen and the cycle will not be completed.
+A slave actively refuses to respond to the cyclic request and aborts the cycle.
+All further communication will not happen and the cycle will not be completed, skipping all following slaves.
+
+The first and only byte in the data section is the sequence number of the cycle to be aborted.
 
 This response contributes 1 to all the slave's fail counter, counting as if they timed out.
 
@@ -107,10 +116,12 @@ This response contributes 1 to all the slave's fail counter, counting as if they
 
 ### 0x14 Cyclic exit
 
-An alternative response to the [cyclic request](#0x10-cyclic-request).
+A possible response to the [cyclic request](#0x10-cyclic-request).
 
 The slave asks to be excluded from all further cyclic communication.
 This is a clean way for a slave to exit the cyclic communication and tell the master to not include it in further cycles.
+
+The first and only byte in the data section of the frame is the sequence number of the responded-to cyclic request.
 
 > [!NOTE]
 >
@@ -127,9 +138,9 @@ The data section is mirrored from the cyclic configuration frame to inform the m
 
 This frame configures a slave's response to the [cyclic request](#0x10-cyclic-request).
 
-Contrary to all other frames, this frame type flips the meaning of the `Source` field, changing it to be the `Destination` of this frame, indicating the slave to be configured.
+The first byte of the data section contains the address of the slave to be configured.
 
-The data section of the frame contains the object IDs to be placed into the frame.
+The rest of data section of the frame contains the object IDs to be placed into the frame.
 For multi-byte objects, there are multiple entries, selecting the lower parts of the object.
 
 > [!NOTE]
