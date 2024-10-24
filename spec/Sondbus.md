@@ -8,6 +8,12 @@ The goal is to create a solid bus that can be used in a cyclic manner for facili
 It works in a single-master principle in that a single device in the network takes on the role of the master that coordinates all communication.
 This makes the whole network timing predictable and the slave implementations smaller.
 
+Table of contents
+
+- [Data Link Layer](#data-link-layer)
+- [Frame Types](#frame-types)
+- [Cyclic communication](#cyclic-communication)
+
 # Data Link layer
 
 The first layer in the sondbus protocol is the data link layer.
@@ -70,10 +76,6 @@ As the communication is time-critical, a mismatched CRC will simply lead to the 
 
 This is probably the most common frame class.
 Frames in this class describe frames that are used in the cyclic communication part of sondbus.
-
-> [!NOTE]
->
-> The first byte in the data section takes a special role for cyclic frames in that it contains the sequence number of the cycle.
 
 ### 0x10 Cyclic request
 
@@ -146,3 +148,5 @@ For multi-byte objects, there are multiple entries, selecting the lower parts of
 > [!NOTE]
 >
 > If the master requests only 2 of 4 available bytes for an object, the lower 2 bytes may be sent
+
+# Cyclic communication
