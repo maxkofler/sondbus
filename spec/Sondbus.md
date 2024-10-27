@@ -28,9 +28,9 @@ In either way, all communication has to be transmitted via this channel.
 The main difference of sondbus is, that all communication is performed in a broadcasting manner.
 This manifests itself in the frame layout in that there is only a source, but no destination address:
 
-| Start | Type | Src | Length | Data  | CRC |
-| :---: | :--: | :-: | :----: | :---: | :-: |
-|   1   |  1   |  1  |   1    | 0-255 |  1  |
+| Start | Type | Address | Length | Data  | CRC |
+| :---: | :--: | :-----: | :----: | :---: | :-: |
+|   1   |  1   |    1    |   1    | 0-255 |  1  |
 
 ### Start
 
@@ -40,9 +40,9 @@ The start byte is always `0x55` to indicate to the other network participants th
 
 The type of data that is transmitted in this frame, see [frame types](#frame-types).
 
-### Src
+### Address
 
-The source address where the frame is sent from.
+The source or destination address, depending on the frame type.
 
 Address `0` is reserved for the master.
 All the other addresses are free to be assigned arbitrary values.
@@ -61,6 +61,14 @@ This can be arbitrary data or even nothing, depending on the frame type.
 All frames are checked for errors using a crc8 checksum.
 The checksum to be used is the `AUTOSAR` flavor.
 
+The CRC is calculated over all the leading bytes, including:
+
+- Start
+- Type
+- Address
+- Length
+- Data
+
 ## Error handling
 
 The inclusion of a CRC hints at the presence of error detection.
@@ -68,85 +76,131 @@ In contrast to OSI layer 2 there is no error correction on the data link layer.
 
 As the communication is time-critical, a mismatched CRC will simply lead to the frame being dropped by all network participants.
 
-# Frame types
+# Frame Types
 
-- [`0x1.` Cyclic frames](#0x1_-cyclic-frames)
+There are various frame types that facilitate the sondbus communication protocol.
 
-## 0x1\_ Cyclic frames
+- Cyclic frame types (`0x1_`)
+  - [`0x10` Cyclic request](#0x10-cyclic-request)
+  - [`0x1E` Cyclic configuration](#0x1e-cyclic-configuration)
+  - [`0x1F` Cyclic configuration confirm](#0x1f-cyclic-configuration-confirm)
 
-This is probably the most common frame class.
-Frames in this class describe frames that are used in the cyclic communication part of sondbus.
+## 0x10 Cyclic request
 
-### 0x10 Cyclic request
+This frame type initiates a new cycle on the network and is sent by the master.
+The address field is used as the source address and should always be 0.
 
-This frame is sent by the master and initiates a new cycle.
+The data section of the frame contains the amount of data in bytes each slave is required to send.
+The layout of the response is agreed-upon in the setup phase of the communication via [cyclic configuration](#0x1f-cyclic-configuration) frames.
 
-The payload is the sequence the master asks the slaves to respond,
-where the first byte is the sequence number of the cycle.
+After this, each slave awaits its turn and sends its data plus a CRC if it sends some data.
+If the slave is not required to send any data, it does not transmit the CRC, leaving the bus untouched.
 
-Each slave stores its position in this queue and responds once it is its turn.
+Each slave can send a maximum of 255 bytes per cycle.
+The following table shows a possible configuration of the data section for this frame type:
 
-### 0x11 Cyclic response
+| Master (`0`) | Slave 1 (`1`) | Slave 2 (`2`) | ... |
+| :----------: | :-----------: | :-----------: | --- |
+|      2       |       0       |       4       | ... |
 
-A possible response to the [cyclic request](#0x10-cyclic-request).
+This declares the following:
 
-The slave inserts the agreed-upon data into the data area of the frame and sends it, reserving the first byte in the response for the sequence number of the cycle that it responds to.
+- The master (addr=0) sends 2 bytes (+1 byte CRC)
+- Slave 1 (addr=1) sends nothing (no CRC)
+- Slave 2 (addr=2) sends 4 bytes (+1 byte CRC)
 
-### 0x12 Cyclic skip
+This request is then followed by a [unframed response](#unframed-response).
 
-A possible response to the [cyclic request](#0x10-cyclic-request).
+## 0x1E Cyclic configuration
 
-The slave skips this cycle due to internal reasons, inserting the sequence number of the cycle as the first and only byte into the data section.
-
-This response contributes 1 to the slave's fail counter, counting as if it timed out.
-
-### 0x13 Cyclic abort
-
-A possible response to the [cyclic request](#0x10-cyclic-request).
-
-A slave actively refuses to respond to the cyclic request and aborts the cycle.
-All further communication will not happen and the cycle will not be completed, skipping all following slaves.
-
-The first and only byte in the data section is the sequence number of the cycle to be aborted.
-
-This response contributes 1 to all the slave's fail counter, counting as if they timed out.
-
-> [!CAUTION]
->
-> This response is actively hurting bus performance and should only be used when absolutely necessary.
-> Too many aborts can completely fail the cyclic communication and lead the master to abort all communication.
-
-### 0x14 Cyclic exit
-
-A possible response to the [cyclic request](#0x10-cyclic-request).
-
-The slave asks to be excluded from all further cyclic communication.
-This is a clean way for a slave to exit the cyclic communication and tell the master to not include it in further cycles.
-
-The first and only byte in the data section of the frame is the sequence number of the responded-to cyclic request.
+This frame type changes the configuration for one slave and adjusts a new set of data to be sent by this slave.
 
 > [!NOTE]
 >
-> It is up to the master when to exclude the slave from the cyclic request frames.
-> After the first exit request, the slave must continue communication with exit responses until it is excluded from the cyclic request frames, allowing it to safely leave the bus.
+> The address field is used as the destination of the frame, addressing the slave to be configured.
 
-### 0x1D Cyclic configuration acknowledge
+The data section of the frame contains the object IDs of the objects to be responded to [cyclic request](#0x10-cyclic-request) frames.
 
-Acknowledges the configuration received via a [cyclic configuration](#0x1e-cyclic-configuration) frame.
+Multi-byte object IDs are repeated for the size, while cutting upper bytes.
+This is best shown in a example:
 
-The data section is mirrored from the cyclic configuration frame to inform the master about the committed layout.
+An object with ID `0xFD` with 32 bits (4 bytes) will be requested via the following string: `FDFDFDFD` (4 repetitions of the object ID).
+If the master is only interested in some subset, the lower bytes will be transmitted.
+The example of the master being only interested in 2 bytes will look as follows: `FDFD` and the lower 16 bits of the object would be sent by the slave.
 
-### 0x1E Cyclic configuration
+The master will also broadcast a configuration frame for its own configuration.
+This informs all the slaves about the objects to expect from the master.
 
-This frame configures a slave's response to the [cyclic request](#0x10-cyclic-request).
+## 0x1F Cyclic configuration confirm
 
-The first byte of the data section contains the address of the slave to be configured.
+This frame is a response to a [cyclic configuration](#0x1e-cyclic-configuration) frame.
 
-The rest of data section of the frame contains the object IDs to be placed into the frame.
-For multi-byte objects, there are multiple entries, selecting the lower parts of the object.
+It basically repeats the contents of the frame to be confirmed and applies it for the following [cyclic request](#0x10-cyclic-request)s.
+This confirms to the master that the slave has successfully applied the new configuration.
 
 > [!NOTE]
 >
-> If the master requests only 2 of 4 available bytes for an object, the lower 2 bytes may be sent
+> The address field is used as the destination, always addressing the master (0).
 
-# Cyclic communication
+# Unframed response
+
+Some responses do not happen in a framed manner, but rather in an interleaved one.
+This saves on data when slaves respond to the master, especially in time-critical communication paths.
+
+In this form of response, the data exchange is not framed up, but rather sent loosely on the bus.
+The slave simply awaits its turn and sends its data and a [CRC](#unframed-response-crc), completely bypassing the framed nature of the bus.
+
+The following example shows the response to a [cyclic request](#0x10-cyclic-request) requesting the following (`XX` represents the CRC):
+
+- Master (addr=0) - 2 bytes: `ABCD`
+- Slave 2 (addr=2) - 4 bytes: `DEADBEEF`
+
+```
+.<request frame>.....ABCD..XX.....DEADBEEF.XX....<end>
+|     Master    |___| Master |___|  Slave 2  |________
+```
+
+### Unframed response timeout
+
+This approach, however has its drawbacks in that a non-responding slave can completely block the communication.
+To prevent this, the master takes a strong hold on the timing of the responses and strictly governs the communication.
+
+Each slave must start its response within `<timeout> x <byte count (without CRC)> x <byte time>`.
+If the slave fails to do so, knowingly or not, the master takes over and fills the slot with arbitrary data and an invalid CRC checksum, the other slaves may also detect the timeout, but may **never** respond, that is the job of the communication master.
+This temporarily bridges the missing slave's communication while not inserting any wrong data into the network.
+
+> [!NOTE]
+>
+> Such a timeout will introduce some delay into the network, but depending on the master, the timed out slave may be excluded from the following cycles.
+
+Slaves may also drop from the bus while in the act of transmitting.
+In this case, bytes may have at most `<timeout> * <byte time>` of spacing.
+In case of this timing being violated, the master takes over the bus and finishes the broken data slot.
+
+> [!NOTE]
+>
+> Once the master has taken over the communication, the overridden slave may not restart transmission, but rather await the next cycle to regain the ability to communicate.
+> The master may **never** be overridden.
+
+### Unframed response CRC
+
+The CRC in each response block is calculated over the following:
+
+- The CRC of the request frame
+- All the data received up to the slave's slot
+- The data transmitted by this slave
+
+This creates a verification chain where each network participant can determine how far it can trust the received data.
+
+If a slave reaches its turn, but the CRC of the previous response is incorrect, it may not respond to the bus, but rather let the master take over communication as if it were timed out.
+
+This makes sure that once one slave times out, all further communication is invalidated and the slaves run no risk of getting out of sync.
+
+The following example shows the CRC influence for the previous response example:
+
+```
+.<request frame>..XX.....ABCD..XX.....DEADBEEF..XX...123456..XX..<end>
+_________________|   CRC 1   |________________________________________
+_________________|           CRC 2            |_______________________
+_________________|                   CRC 3                 |__________
+```
