@@ -82,8 +82,10 @@ There are various frame types that facilitate the sondbus communication protocol
 
 - Cyclic frame types (`0x1_`)
   - [`0x10` Cyclic request](#0x10-cyclic-request)
-  - [`0x1E` Cyclic configuration](#0x1e-cyclic-configuration)
-  - [`0x1F` Cyclic configuration confirm](#0x1f-cyclic-configuration-confirm)
+- Cyclic configuration frames (`0x2_`)
+  - [`0x20` Cyclic object configuration](#0x20-cyclic-object-configuration)
+  - [`0x21` Cyclic object configuration confirm](#0x21-cyclic-object-configuration-confirm)
+  - [`0x22` Cyclic object configuration reject](#0x22-cyclic-object-configuration-reject)
 
 ## 0x10 Cyclic request
 
@@ -111,7 +113,7 @@ This declares the following:
 
 This request is then followed by a [unframed response](#unframed-response).
 
-## 0x1E Cyclic configuration
+## 0x20 Cyclic object configuration
 
 This frame type changes the configuration for one slave and adjusts a new set of data to be sent by this slave.
 
@@ -131,12 +133,23 @@ The example of the master being only interested in 2 bytes will look as follows:
 The master will also broadcast a configuration frame for its own configuration.
 This informs all the slaves about the objects to expect from the master.
 
-## 0x1F Cyclic configuration confirm
+## 0x21 Cyclic object configuration confirm
 
-This frame is a response to a [cyclic configuration](#0x1e-cyclic-configuration) frame.
+This frame is a response to a [cyclic object configuration](#0x20-cyclic-object-configuration) frame.
 
 It basically repeats the contents of the frame to be confirmed and applies it for the following [cyclic request](#0x10-cyclic-request)s.
 This confirms to the master that the slave has successfully applied the new configuration.
+
+> [!NOTE]
+>
+> The address field is used as the destination, always addressing the master (0).
+
+## 0x22 Cyclic object configuration reject
+
+This frame is a response to a [cyclic object configuration](#0x20-cyclic-object-configuration) frame.
+
+The slave rejects the cyclic configuration and the new configuration is not applied.
+This can be caused by many different things and the data section of the response contains a UTF-8 string explaining the failure.
 
 > [!NOTE]
 >
