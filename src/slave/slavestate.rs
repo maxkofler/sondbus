@@ -89,7 +89,7 @@ impl BusState {
                         crc: crc.update_single_move(data),
                         ty,
                         addr,
-                        remaining: data,
+                        remaining: data - 1,
                     },
                 },
                 None,
