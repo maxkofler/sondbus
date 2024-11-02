@@ -208,8 +208,9 @@ mod test {
 
     #[test]
     fn handles_filled_frame() {
+        let mut state = BusState::default();
+
         for i in 0..=255u8 {
-            let mut state = BusState::default();
             let mut crc = CRC8Autosar::new();
 
             let data = [START_BYTE, 0, 0, i];
