@@ -17,6 +17,17 @@ pub trait CRC<T> {
     /// * `data` - The data to calculate into the CRC sum
     fn update_single(&mut self, data: u8);
 
+    /// Updates the CRC and performing a move, returning `self`
+    /// # Arguments
+    /// * `data` - The data to update the CRC with
+    fn update_single_move(mut self, data: u8) -> Self
+    where
+        Self: Sized,
+    {
+        self.update_single(data);
+        self
+    }
+
     /// Update the CRC computing instance with the supplied bytes
     /// # Arguments
     /// * `data` - The data to calculate into the CRC sum
@@ -24,6 +35,17 @@ pub trait CRC<T> {
         for d in data {
             self.update_single(*d);
         }
+    }
+
+    /// Updates the CRC and performing a move, returning `self`
+    /// # Arguments
+    /// * `data` - The data to update the CRC with
+    fn update_move(mut self, data: &[u8]) -> Self
+    where
+        Self: Sized,
+    {
+        self.update(data);
+        self
     }
 
     /// Non-destructively finalize the CRC, apply the last XOR and return
@@ -34,6 +56,7 @@ pub trait CRC<T> {
 }
 
 /// An implementation of the AUTOSAR CRC8 algorithm
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CRC8Autosar {
     pub crc: u8,
 }
