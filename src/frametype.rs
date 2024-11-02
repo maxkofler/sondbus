@@ -1,4 +1,4 @@
-use crate::{Bus, FrameAction};
+use crate::{frameaction::FrameAction, Bus};
 
 /// The various frame types within sondbus
 #[derive(Debug, PartialEq, Eq, Clone)]

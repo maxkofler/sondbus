@@ -1,7 +1,8 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
+    frameaction::FrameAction,
     frametype::FrameType,
-    Bus, FrameAction, START_BYTE,
+    Bus, START_BYTE,
 };
 
 /// The underlying state the bus is in when being used
