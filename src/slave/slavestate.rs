@@ -146,3 +146,96 @@ impl BusState {
         (self, None)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        crc8::{CRC8Autosar, CRC},
+        START_BYTE,
+    };
+
+    use super::BusState;
+
+    #[test]
+    fn waits_for_start() {
+        let state = BusState::default();
+
+        assert_eq!(
+            state.clone().handle(0xFF).0,
+            state,
+            "Bus does not ignore non-start bytes"
+        );
+        assert_eq!(
+            state.handle(START_BYTE).0,
+            BusState::WaitForType,
+            "Bus does not react to start byte"
+        );
+    }
+
+    #[test]
+    fn handles_empty_frame() {
+        let mut state = BusState::default();
+
+        let data = [START_BYTE, 0, 0, 0, 0];
+
+        for byte in data {
+            state = state.handle(byte).0;
+        }
+
+        assert_eq!(
+            state,
+            BusState::WaitForStart,
+            "Bus does not handle an empty frame"
+        )
+    }
+
+    #[test]
+    fn crc_empty_frame() {
+        let mut state = BusState::default();
+
+        let data = [START_BYTE, 0, 0, 0];
+
+        for byte in data {
+            state = state.handle(byte).0;
+        }
+
+        if let BusState::WaitForCRC { ty: _, crc } = state {
+            let real_crc = CRC8Autosar::new().update_move(&data);
+
+            assert_eq!(real_crc.finalize(), crc.finalize());
+        }
+    }
+
+    #[test]
+    fn handles_filled_frame() {
+        for i in 0..=255u8 {
+            let mut state = BusState::default();
+            let mut crc = CRC8Autosar::new();
+
+            let data = [START_BYTE, 0, 0, i];
+            for b in data {
+                state = state.handle(b).0;
+                crc.update_single(b);
+            }
+
+            assert_ne!(
+                state,
+                BusState::WaitForStart,
+                "Bus does not exit idle state"
+            );
+
+            for b in 0..i {
+                state = state.handle(b).0;
+                crc.update_single(b);
+            }
+
+            state = state.handle(crc.finalize()).0;
+
+            assert_eq!(
+                state,
+                BusState::WaitForStart,
+                "Bus does not handle filled frame correctly"
+            );
+        }
+    }
+}
