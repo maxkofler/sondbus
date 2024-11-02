@@ -1,6 +1,7 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
-    FrameAction, FrameType, START_BYTE,
+    frametype::FrameType,
+    Bus, FrameAction, START_BYTE,
 };
 
 /// The underlying state the bus is in when being used
@@ -46,7 +47,7 @@ impl BusState {
     /// * `data` - The data to handle
     /// # Returns
     /// A tuple of `self` and the data to respond, if any
-    pub fn handle(self, data: u8) -> (Self, Option<u8>) {
+    pub fn handle(self, data: u8, bus: &mut dyn Bus) -> (Self, Option<u8>) {
         match self {
             //
             // Wait for the start byte, ignore all other bytes
@@ -61,7 +62,7 @@ impl BusState {
             Self::WaitForType => (
                 Self::WaitForAddress {
                     crc: CRC8Autosar::new().update_move(&[START_BYTE, data]),
-                    ty: FrameType::from_u8(data),
+                    ty: FrameType::from_u8(data, bus),
                 },
                 None,
             ),
@@ -71,7 +72,7 @@ impl BusState {
             Self::WaitForAddress { crc, ty } => (
                 Self::WaitForLength {
                     crc: crc.update_single_move(data),
-                    ty,
+                    ty: ty.map(|ty| ty.address(data)),
                     addr: data,
                 },
                 None,
@@ -82,7 +83,7 @@ impl BusState {
             Self::WaitForLength { crc, ty, addr } => (
                 match data {
                     0 => Self::WaitForCRC {
-                        ty,
+                        ty: ty.map(|ty| ty.length(data)),
                         crc: crc.update_single_move(data),
                     },
                     data => Self::HandleData {
@@ -111,7 +112,7 @@ impl BusState {
                     None,
                 ),
                 _ => {
-                    let ty = ty.map(|ty| ty.process(data, addr));
+                    let ty = ty.map(|ty| ty.handle(data));
                     (
                         Self::HandleData {
                             crc: crc.update_single_move(data),
@@ -128,7 +129,7 @@ impl BusState {
             //
             Self::WaitForCRC { crc, ty } => {
                 if crc.finalize() == data {
-                    match ty.map(|f| f.commit()) {
+                    match ty.map(|f| f.commit(bus)) {
                         None => (Self::WaitForStart, Some(0xFF)),
                         Some(t) => match t {
                             FrameAction::None => (Self::WaitForStart, None),
@@ -151,22 +152,27 @@ impl BusState {
 mod test {
     use crate::{
         crc8::{CRC8Autosar, CRC},
-        START_BYTE,
+        Bus, START_BYTE,
     };
 
     use super::BusState;
+
+    #[derive(Debug, Default)]
+    pub struct DummyBus {}
+
+    impl Bus for DummyBus {}
 
     #[test]
     fn waits_for_start() {
         let state = BusState::default();
 
         assert_eq!(
-            state.clone().handle(0xFF).0,
+            state.clone().handle(0xFF, &mut DummyBus::default()).0,
             state,
             "Bus does not ignore non-start bytes"
         );
         assert_eq!(
-            state.handle(START_BYTE).0,
+            state.handle(START_BYTE, &mut DummyBus::default()).0,
             BusState::WaitForType,
             "Bus does not react to start byte"
         );
@@ -179,7 +185,7 @@ mod test {
         let data = [START_BYTE, 0, 0, 0, 0];
 
         for byte in data {
-            state = state.handle(byte).0;
+            state = state.handle(byte, &mut DummyBus::default()).0;
         }
 
         assert_eq!(
@@ -196,7 +202,7 @@ mod test {
         let data = [START_BYTE, 0, 0, 0];
 
         for byte in data {
-            state = state.handle(byte).0;
+            state = state.handle(byte, &mut DummyBus::default()).0;
         }
 
         if let BusState::WaitForCRC { ty: _, crc } = state {
@@ -215,7 +221,7 @@ mod test {
 
             let data = [START_BYTE, 0, 0, i];
             for b in data {
-                state = state.handle(b).0;
+                state = state.handle(b, &mut DummyBus::default()).0;
                 crc.update_single(b);
             }
 
@@ -226,11 +232,11 @@ mod test {
             );
 
             for b in 0..i {
-                state = state.handle(b).0;
+                state = state.handle(b, &mut DummyBus::default()).0;
                 crc.update_single(b);
             }
 
-            state = state.handle(crc.finalize()).0;
+            state = state.handle(crc.finalize(), &mut DummyBus::default()).0;
 
             assert_eq!(
                 state,

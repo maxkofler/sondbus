@@ -2,10 +2,11 @@
 mod slavestate;
 pub use slavestate::*;
 
-use crate::PhysicalAddress;
+use crate::{Bus, PhysicalAddress};
 
 /// An instance of a sondbus slave
 #[allow(dead_code)]
+#[derive(Clone, Default)]
 pub struct Slave<const NUM_OBJECTS: u8> {
     /// The logical network address of this slave
     address: Option<u8>,
@@ -13,7 +14,20 @@ pub struct Slave<const NUM_OBJECTS: u8> {
     /// The physical address for this device
     physical_address: PhysicalAddress,
 
-    bus_state: BusState,
+    state: BusState,
+
+    bus: SlaveBus,
+}
+
+#[derive(Clone, Default)]
+struct SlaveBus {}
+
+impl Bus for SlaveBus {}
+
+impl SlaveBus {
+    pub const fn const_default() -> Self {
+        Self {}
+    }
 }
 
 impl<const NUM_OBJECTS: u8> Slave<NUM_OBJECTS> {
@@ -21,7 +35,8 @@ impl<const NUM_OBJECTS: u8> Slave<NUM_OBJECTS> {
         Self {
             address: None,
             physical_address: PhysicalAddress::const_default(),
-            bus_state: BusState::const_default(),
+            state: BusState::const_default(),
+            bus: SlaveBus::const_default(),
         }
     }
 
@@ -29,13 +44,14 @@ impl<const NUM_OBJECTS: u8> Slave<NUM_OBJECTS> {
         Self {
             address: None,
             physical_address,
-            bus_state: BusState::default(),
+            state: BusState::default(),
+            bus: SlaveBus::default(),
         }
     }
 
     pub fn handle(mut self, data: u8) -> (Self, Option<u8>) {
-        let (state, response) = self.bus_state.handle(data);
-        self.bus_state = state;
+        let (state, response) = self.state.handle(data, &mut self.bus);
+        self.state = state;
 
         (self, response)
     }
