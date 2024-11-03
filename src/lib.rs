@@ -21,4 +21,9 @@ impl PhysicalAddress {
     }
 }
 
-pub trait Bus {}
+pub trait Bus {
+    /// Returns the logical address of this bus participant
+    fn get_address(&self) -> Option<u8> {
+        None
+    }
+}
