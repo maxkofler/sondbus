@@ -162,15 +162,17 @@ This saves on data when slaves respond to the master, especially in time-critica
 
 In this form of response, the data exchange is not framed up, but rather sent loosely on the bus.
 The slave simply awaits its turn and sends its data and a [CRC](#unframed-response-crc), completely bypassing the framed nature of the bus.
+Slaves that are asked to send no data (0 bytes) still send the [CRC](#unframed-response-crc) to signal that the chain is still intact.
 
 The following example shows the response to a [cyclic request](#0x10-cyclic-request) requesting the following (`XX` represents the CRC):
 
 - Master (addr=0) - 2 bytes: `ABCD`
+- Slave 1 (addr=1) - 0 bytes, but the CRC
 - Slave 2 (addr=2) - 4 bytes: `DEADBEEF`
 
 ```
-.<request frame>.....ABCD..XX.....DEADBEEF.XX....<end>
-|     Master    |___| Master |___|  Slave 2  |________
+.<request frame>.....ABCD..XX.......XX........DEADBEEF.XX...<end>
+|     Master    |___| Master |__| Slave 1 |__|  Slave 2  |_______
 ```
 
 ### Unframed response timeout
