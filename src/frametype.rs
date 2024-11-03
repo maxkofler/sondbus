@@ -1,4 +1,8 @@
-use crate::{frameaction::FrameAction, Bus};
+//! The various types of frames available within sondbus
+use crate::{frameaction::FrameAction, Bus, FrameDataHandler};
+
+mod cyclic_request;
+pub use cyclic_request::*;
 
 /// The various frame types within sondbus
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -15,50 +19,28 @@ impl FrameType {
     /// * `bus` - The bus to operate on
     pub fn from_u8(data: u8, bus: &dyn Bus) -> Option<Self> {
         match data {
-            0x10 => Some(Self::CyclicRequest(CyclicRequest::default())),
+            0x10 => Some(Self::CyclicRequest(CyclicRequest::new(bus.get_address()))),
             _ => None,
         }
     }
+}
 
-    /// Pass in the target address of the frame data that is to be coming in
-    /// # Arguments
-    /// * `addr` - The address to set
-    pub fn address(self, addr: u8) -> Self {
-        self
-    }
-
-    /// Pass in the length of the data to be received
-    ///
-    /// This function is called after `address()`
-    /// # Arguments
-    /// * `length` - The length the incoming data is to be expected
-    pub fn length(self, length: u8) -> Self {
-        self
-    }
-
-    /// Handle a incoming data byte from the data link layer
-    ///
-    /// This function is called after `length()`
-    /// # Arguments
-    /// * `data` - The data byte to handle
-    pub fn handle(self, data: u8) -> Self {
+impl FrameDataHandler for FrameType {
+    fn address(self, _addr: u8) -> Self {
         match self {
             Self::CyclicRequest(request) => Self::CyclicRequest(request),
         }
     }
 
-    /// Commit this frame's information to the bus
-    ///
-    /// This function is called after `handle()` and is the last function
-    /// # Arguments
-    /// * `bus` - The bus to commit the changes to / derive the action from
-    /// # Returns
-    /// An action that is derived from this frame
-    pub fn commit(self, bus: &mut dyn Bus) -> FrameAction {
-        FrameAction::None
+    fn handle(self, data: u8) -> Self {
+        match self {
+            Self::CyclicRequest(request) => Self::CyclicRequest(request.handle(data)),
+        }
+    }
+
+    fn commit(self, bus: &mut dyn Bus) -> FrameAction {
+        match self {
+            Self::CyclicRequest(request) => request.commit(bus),
+        }
     }
 }
-
-/// A cyclic request frame requesting cyclic data
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct CyclicRequest {}

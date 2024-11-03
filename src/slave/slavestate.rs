@@ -1,8 +1,8 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
-    frameaction::FrameAction,
+    frameaction::{FrameAction, UnframedResponse},
     frametype::FrameType,
-    Bus, START_BYTE,
+    Bus, FrameDataHandler, START_BYTE,
 };
 
 /// The underlying state the bus is in when being used
@@ -36,6 +36,7 @@ pub enum BusState {
         ty: Option<FrameType>,
         crc: CRC8Autosar,
     },
+    UnframedResponse(UnframedResponse),
 }
 
 impl BusState {
@@ -132,20 +133,35 @@ impl BusState {
                 if crc.finalize() == data {
                     match ty.map(|f| f.commit(bus)) {
                         None => (Self::WaitForStart, Some(0xFF)),
-                        Some(t) => match t {
-                            FrameAction::None => (Self::WaitForStart, None),
-                        },
+                        Some(action) => (Self::handle_frame_action(action), Some(0xFF)),
                     }
                 } else {
                     (Self::WaitForStart, Some(0xAA))
                 }
+            }
+            Self::UnframedResponse(response) => {
+                let (action, response) = response.next();
+                (Self::handle_frame_action(action), response)
             }
         }
     }
 
     /// Get the next byte to send over the bus, if available
     pub fn next(self) -> (Self, Option<u8>) {
-        (self, None)
+        match self {
+            Self::UnframedResponse(response) => {
+                let (action, response) = response.next();
+                (Self::handle_frame_action(action), response)
+            }
+            x => (x, None),
+        }
+    }
+
+    fn handle_frame_action(action: FrameAction) -> Self {
+        match action {
+            FrameAction::None => Self::WaitForStart,
+            FrameAction::UnframedResponse(response) => Self::UnframedResponse(response),
+        }
     }
 }
 

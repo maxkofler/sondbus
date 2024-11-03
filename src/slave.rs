@@ -11,7 +11,7 @@ pub struct Slave<const NUM_OBJECTS: u8> {
     /// The physical address for this device
     physical_address: PhysicalAddress,
 
-    state: BusState,
+    pub state: BusState,
 
     bus: SlaveBus,
 }
@@ -54,6 +54,13 @@ impl<const NUM_OBJECTS: u8> Slave<NUM_OBJECTS> {
 
     pub fn handle(mut self, data: u8) -> (Self, Option<u8>) {
         let (state, response) = self.state.handle(data, &mut self.bus);
+        self.state = state;
+
+        (self, response)
+    }
+
+    pub fn next(mut self) -> (Self, Option<u8>) {
+        let (state, response) = self.state.next();
         self.state = state;
 
         (self, response)
