@@ -1,10 +1,6 @@
 #![no_std]
 
-pub mod frameaction;
-pub mod frametype;
-
 pub mod slave;
-use frameaction::FrameAction;
 pub use slave::*;
 pub mod crc8;
 
@@ -56,6 +52,7 @@ pub trait FrameDataHandler: Sized {
         self
     }
 
+    /*
     /// Commit this frame's information to the bus
     ///
     /// This function is called after `handle()` and is the last function
@@ -64,4 +61,5 @@ pub trait FrameDataHandler: Sized {
     /// # Returns
     /// An action that is derived from this frame
     fn commit(self, _bus: &mut dyn Bus) -> FrameAction;
+    */
 }
