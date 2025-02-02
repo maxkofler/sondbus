@@ -63,3 +63,17 @@ pub trait FrameDataHandler: Sized {
     fn commit(self, _bus: &mut dyn Bus) -> FrameAction;
     */
 }
+
+#[cfg(test)]
+mod test {
+    use crate::Slave;
+
+    #[test]
+    fn sond() {
+        let mut slave = Slave::new();
+
+        let ret = slave.handle_mut(Some(0x55));
+
+        assert!(ret.is_none())
+    }
+}
