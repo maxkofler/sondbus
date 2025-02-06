@@ -4,6 +4,18 @@ mod state {
 
     mod wait_for_type;
     pub use wait_for_type::WaitForType;
+
+    mod wait_for_address;
+    pub use wait_for_address::WaitForAddress;
+
+    mod wait_for_length;
+    pub use wait_for_length::WaitForLength;
+
+    mod wait_for_data;
+    pub use wait_for_data::WaitForData;
+
+    mod wait_for_crc;
+    pub use wait_for_crc::WaitForCRC;
 }
 
 use replace_with::replace_with_or_abort_unchecked;
@@ -38,6 +50,10 @@ impl Slave {
 enum StateMachine {
     WaitForStart(Core<WaitForStart>),
     WaitForType(Core<WaitForType>),
+    WaitForAddress(Core<WaitForAddress>),
+    WaitForLength(Core<WaitForLength>),
+    WaitForData(Core<WaitForData>),
+    WaitForCRC(Core<WaitForCRC>),
 }
 
 trait State {
@@ -57,6 +73,10 @@ impl Handler for StateMachine {
         match self {
             Self::WaitForStart(state) => state.state.handle(byte),
             Self::WaitForType(state) => state.state.handle(byte),
+            Self::WaitForAddress(state) => state.state.handle(byte),
+            Self::WaitForLength(state) => state.state.handle(byte),
+            Self::WaitForData(state) => state.state.handle(byte),
+            Self::WaitForCRC(state) => state.state.handle(byte),
         }
     }
 }

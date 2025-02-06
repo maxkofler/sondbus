@@ -1,4 +1,8 @@
-use crate::slave::{Core, Handler, State, StateMachine};
+use crate::{
+    crc8::{CRC8Autosar, CRC},
+    slave::{Core, Handler, State, StateMachine},
+    START_BYTE,
+};
 
 use super::WaitForType;
 
@@ -12,8 +16,11 @@ impl State for WaitForStart {
 impl Handler for WaitForStart {
     fn handle(self, byte: Option<u8>) -> (crate::slave::StateMachine, Option<u8>) {
         if let Some(byte) = byte {
-            if byte == 0x55 {
-                return (WaitForType {}.to_state(), None);
+            if byte == START_BYTE {
+                return (
+                    WaitForType::new(CRC8Autosar::new().update_single_move(byte)).to_state(),
+                    None,
+                );
             }
         }
 
@@ -25,13 +32,13 @@ impl Handler for WaitForStart {
 mod test {
     use crate::{
         slave::{Handler, StateMachine},
-        Slave,
+        Slave, START_BYTE,
     };
 
     #[test]
     fn rx_start_byte() {
         let slave = Slave::new();
-        let (state, response) = slave.handle(Some(0x55));
+        let (state, response) = slave.handle(Some(START_BYTE));
 
         assert!(
             matches!(state, StateMachine::WaitForType(..)),
