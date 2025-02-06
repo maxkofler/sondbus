@@ -3,6 +3,7 @@
 pub mod slave;
 pub use slave::*;
 pub mod crc8;
+pub mod ringbuf;
 
 /// The byte that marks the start of a sondbus frame
 pub const START_BYTE: u8 = 0x55;
