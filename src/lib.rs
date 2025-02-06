@@ -65,6 +65,20 @@ pub trait FrameDataHandler: Sized {
     */
 }
 
+#[repr(u8)]
+pub enum FrameType {
+    CyclicRequest = 0x1,
+}
+
+impl FrameType {
+    pub fn from_u8(byte: u8) -> Option<Self> {
+        match byte {
+            0x10 => Some(Self::CyclicRequest),
+            _ => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::Slave;
