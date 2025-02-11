@@ -4,7 +4,7 @@ use crate::{
     FrameType,
 };
 
-use super::WaitForStart;
+use super::{Ping, WaitForStart};
 
 pub struct WaitForCRC {
     pub ty: FrameType,
@@ -29,9 +29,12 @@ impl Handler for WaitForCRC {
     fn handle(self, byte: Option<u8>) -> (crate::slave::StateMachine, Option<u8>) {
         if let Some(byte) = byte {
             if self.crc == byte {
-                return (WaitForStart {}.to_state(), Some(0x55));
+                match self.ty {
+                    FrameType::Ping => return Ping::default().handle(None),
+                    _ => return (WaitForStart {}.to_state(), None),
+                }
             } else {
-                return (WaitForStart {}.to_state(), Some(0xBB));
+                return (WaitForStart {}.to_state(), None);
             }
         }
 

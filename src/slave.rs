@@ -16,6 +16,9 @@ mod state {
 
     mod wait_for_crc;
     pub use wait_for_crc::WaitForCRC;
+
+    mod frame_ping;
+    pub use frame_ping::Ping;
 }
 
 use replace_with::replace_with_or_abort_unchecked;
@@ -54,6 +57,7 @@ enum StateMachine {
     WaitForLength(Core<WaitForLength>),
     WaitForData(Core<WaitForData>),
     WaitForCRC(Core<WaitForCRC>),
+    FramePing(Core<Ping>),
 }
 
 trait State {
@@ -77,6 +81,7 @@ impl Handler for StateMachine {
             Self::WaitForLength(state) => state.state.handle(byte),
             Self::WaitForData(state) => state.state.handle(byte),
             Self::WaitForCRC(state) => state.state.handle(byte),
+            Self::FramePing(state) => state.state.handle(byte),
         }
     }
 }
@@ -91,4 +96,15 @@ impl<S: State + Handler> State for Core<S> {
     fn to_state(self) -> StateMachine {
         self.state.to_state()
     }
+}
+
+#[macro_export]
+macro_rules! impl_state {
+    ($x: ty, $y: expr) => {
+        impl State for $x {
+            fn to_state(self) -> crate::slave::StateMachine {
+                $y(Core { state: self })
+            }
+        }
+    };
 }
