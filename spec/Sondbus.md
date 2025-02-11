@@ -80,12 +80,22 @@ As the communication is time-critical, a mismatched CRC will simply lead to the 
 
 There are various frame types that facilitate the sondbus communication protocol.
 
+- Management frames (`0x0_`)
+  - [`0x00` Ping](#0x00-ping)
 - Cyclic frame types (`0x1_`)
   - [`0x10` Cyclic request](#0x10-cyclic-request)
 - Cyclic configuration frames (`0x2_`)
   - [`0x20` Cyclic object configuration](#0x20-cyclic-object-configuration)
   - [`0x21` Cyclic object configuration confirm](#0x21-cyclic-object-configuration-confirm)
   - [`0x22` Cyclic object configuration reject](#0x22-cyclic-object-configuration-reject)
+
+## 0x00 Ping
+
+This frame type allows the master to request presence information from a slave.
+The master sends this frame to the desired address and receives a mirrored response where the address is set to `0` (the master).
+
+The contents of the `data` field are ignored by the slave.
+The slave inserts its address into the `data` field of the response and sends it to the master `0x00`.
 
 ## 0x10 Cyclic request
 
