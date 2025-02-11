@@ -1,0 +1,9 @@
+[package]
+name = "conformance"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+humantime = "2.1.0"
+serial2 = "0.2.28"
+sondbus = { path = "../" }
