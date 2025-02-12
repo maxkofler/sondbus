@@ -88,6 +88,14 @@ There are various frame types that facilitate the sondbus communication protocol
   - [`0x22` Cyclic object configuration confirm](#0x22-cyclic-object-configuration-confirm)
   - [`0x23` Cyclic object configuration reject](#0x23-cyclic-object-configuration-reject)
 
+# Object dictionary
+
+Each sondbus slave presents an object dictionary that holds all the possible data fields that can be read or written by the master.
+
+An object is identified by its object id which is a `16-bit` unique identifier.
+Sondbus does not foresee the use of subindices to make implementations as small and easy as possible.
+Each object defines a type and a size with the maximum being `255 bytes`.
+
 ## 0x00 Ping
 
 This frame type allows the master to request presence information from a slave.
