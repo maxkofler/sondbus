@@ -1,5 +1,6 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
+    impl_state,
     slave::{Core, Handler, State, StateMachine},
     FrameType,
 };
@@ -11,15 +12,11 @@ pub struct WaitForAddress {
     pub crc: CRC8Autosar,
 }
 
+impl_state!(WaitForAddress, StateMachine::WaitForAddress);
+
 impl WaitForAddress {
     pub fn new(ty: FrameType, crc: CRC8Autosar) -> Self {
         Self { ty, crc }
-    }
-}
-
-impl State for WaitForAddress {
-    fn to_state(self) -> crate::slave::StateMachine {
-        StateMachine::WaitForAddress(Core { state: self })
     }
 }
 

@@ -1,5 +1,6 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
+    impl_state,
     slave::{Core, Handler, State, StateMachine},
     FrameType,
 };
@@ -12,15 +13,11 @@ pub struct WaitForLength {
     pub crc: CRC8Autosar,
 }
 
+impl_state!(WaitForLength, StateMachine::WaitForLength);
+
 impl WaitForLength {
     pub fn new(ty: FrameType, addr: u8, crc: CRC8Autosar) -> Self {
         Self { ty, addr, crc }
-    }
-}
-
-impl State for WaitForLength {
-    fn to_state(self) -> crate::slave::StateMachine {
-        StateMachine::WaitForLength(Core { state: self })
     }
 }
 

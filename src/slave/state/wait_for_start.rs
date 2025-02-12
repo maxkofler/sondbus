@@ -1,5 +1,6 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
+    impl_state,
     slave::{Core, Handler, State, StateMachine},
     START_BYTE,
 };
@@ -8,11 +9,8 @@ use super::WaitForType;
 
 pub struct WaitForStart {}
 
-impl State for WaitForStart {
-    fn to_state(self) -> crate::slave::StateMachine {
-        StateMachine::WaitForStart(Core { state: self })
-    }
-}
+impl_state!(WaitForStart, StateMachine::WaitForStart);
+
 impl Handler for WaitForStart {
     fn handle(self, byte: Option<u8>) -> (crate::slave::StateMachine, Option<u8>) {
         if let Some(byte) = byte {

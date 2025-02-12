@@ -1,5 +1,6 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
+    impl_state,
     slave::{Core, Handler, State, StateMachine},
     FrameType,
 };
@@ -10,17 +11,14 @@ pub struct WaitForType {
     pub crc: CRC8Autosar,
 }
 
+impl_state!(WaitForType, StateMachine::WaitForType);
+
 impl WaitForType {
     pub fn new(crc: CRC8Autosar) -> Self {
         Self { crc }
     }
 }
 
-impl State for WaitForType {
-    fn to_state(self) -> crate::slave::StateMachine {
-        StateMachine::WaitForType(Core { state: self })
-    }
-}
 impl Handler for WaitForType {
     fn handle(self, byte: Option<u8>) -> (crate::slave::StateMachine, Option<u8>) {
         if let Some(byte) = byte {
