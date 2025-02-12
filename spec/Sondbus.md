@@ -82,12 +82,11 @@ There are various frame types that facilitate the sondbus communication protocol
 
 - Management frames (`0x0_`)
   - [`0x00` Ping](#0x00-ping)
-- Cyclic frame types (`0x1_`)
-  - [`0x10` Cyclic request](#0x10-cyclic-request)
-- Cyclic configuration frames (`0x2_`)
-  - [`0x20` Cyclic object configuration](#0x20-cyclic-object-configuration)
-  - [`0x21` Cyclic object configuration confirm](#0x21-cyclic-object-configuration-confirm)
-  - [`0x22` Cyclic object configuration reject](#0x22-cyclic-object-configuration-reject)
+- Cyclic frame types (`0x2_`)
+  - [`0x20` Cyclic request](#0x20-cyclic-request)
+  - [`0x21` Cyclic object configuration](#0x21-cyclic-object-configuration)
+  - [`0x22` Cyclic object configuration confirm](#0x22-cyclic-object-configuration-confirm)
+  - [`0x23` Cyclic object configuration reject](#0x23-cyclic-object-configuration-reject)
 
 ## 0x00 Ping
 
@@ -97,7 +96,7 @@ The master sends this frame to the desired address and receives a mirrored respo
 The contents of the `data` field are ignored by the slave.
 The slave inserts its address into the `data` field of the response and sends it to the master `0x00`.
 
-## 0x10 Cyclic request
+## 0x20 Cyclic request
 
 This frame type initiates a new cycle on the network and is sent by the master.
 The address field is used as the source address and should always be 0.
@@ -123,7 +122,7 @@ This declares the following:
 
 This request is then followed by a [unframed response](#unframed-response).
 
-## 0x20 Cyclic object configuration
+## 0x21 Cyclic object configuration
 
 This frame type changes the configuration for one slave and adjusts a new set of data to be sent by this slave.
 
@@ -143,20 +142,20 @@ The example of the master being only interested in 2 bytes will look as follows:
 The master will also broadcast a configuration frame for its own configuration.
 This informs all the slaves about the objects to expect from the master.
 
-## 0x21 Cyclic object configuration confirm
+## 0x22 Cyclic object configuration confirm
 
-This frame is a response to a [cyclic object configuration](#0x20-cyclic-object-configuration) frame.
+This frame is a response to a [cyclic object configuration](#0x21-cyclic-object-configuration) frame.
 
-It basically repeats the contents of the frame to be confirmed and applies it for the following [cyclic request](#0x10-cyclic-request)s.
+It basically repeats the contents of the frame to be confirmed and applies it for the following [cyclic request](#0x20-cyclic-request)s.
 This confirms to the master that the slave has successfully applied the new configuration.
 
 > [!NOTE]
 >
 > The address field is used as the destination, always addressing the master (0).
 
-## 0x22 Cyclic object configuration reject
+## 0x23 Cyclic object configuration reject
 
-This frame is a response to a [cyclic object configuration](#0x20-cyclic-object-configuration) frame.
+This frame is a response to a [cyclic object configuration](#0x21-cyclic-object-configuration) frame.
 
 The slave rejects the cyclic configuration and the new configuration is not applied.
 This can be caused by many different things and the data section of the response contains a UTF-8 string explaining the failure.
@@ -174,7 +173,7 @@ In this form of response, the data exchange is not framed up, but rather sent lo
 The slave simply awaits its turn and sends its data and a [CRC](#unframed-response-crc), completely bypassing the framed nature of the bus.
 Slaves that are asked to send no data (0 bytes) still send the [CRC](#unframed-response-crc) to signal that the chain is still intact.
 
-The following example shows the response to a [cyclic request](#0x10-cyclic-request) requesting the following (`XX` represents the CRC):
+The following example shows the response to a [cyclic request](#0x20-cyclic-request) requesting the following (`XX` represents the CRC):
 
 - Master (addr=0) - 2 bytes: `ABCD`
 - Slave 1 (addr=1) - 0 bytes, but the CRC
