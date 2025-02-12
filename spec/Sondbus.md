@@ -82,6 +82,10 @@ There are various frame types that facilitate the sondbus communication protocol
 
 - Management frames (`0x0_`)
   - [`0x00` Ping](#0x00-ping)
+- Acyclic communication (`0x1_`)
+  - [`0x10` SDO Read](#0x10-sdo-read)
+  - [`0x11` SDO Response](#0x11-sdo-response)
+  - [`0x1F` SDO Abort](#0x1f-sdo-abort)
 - Cyclic frame types (`0x2_`)
   - [`0x20` Cyclic request](#0x20-cyclic-request)
   - [`0x21` Cyclic object configuration](#0x21-cyclic-object-configuration)
@@ -103,6 +107,51 @@ The master sends this frame to the desired address and receives a mirrored respo
 
 The contents of the `data` field are ignored by the slave.
 The slave inserts its address into the `data` field of the response and sends it to the master `0x00`.
+
+## 0x10 SDO Read
+
+This frame type allows the master to request object data from a slave.
+
+The address field of the request determines the slave to pull the object data from.
+
+The `data` field can be either 2 or 4 bytes, depending on the intention of the master:
+
+- `2`: Read the whole object: [`Index (H)`, `Index (L)`]
+- `4`: Read the object from position `A` to `B`: [`Index (H)`, `Index (L)`, `A`, `B`]
+
+The responses to this frame can be either a [SDO Response](#0x11-sdo-response) or a [SDO Abort](#0x1f-sdo-abort) if the request cannot be fulfilled.
+
+## 0x11 SDO Response
+
+This frame type originates from the slave and is initiated by a [SDO request](#0x10-sdo-read).
+It simply answers with the data requested by the master in the SDO request.
+
+The address is `0`.
+
+## 0x1F SDO Abort
+
+This frame type originates from the slave and is initiated by any SDO request and indicates failure to fulfil the request by the master.
+
+The `address` field is `0`.
+
+The `data` field is filled with the following structure:
+
+```rust
+struct SDOError {
+  operation: u8,    // 0 for read, 1 for write
+  index: u16,       // The index of the object that was accessed
+  abort_code: u16   // An abort code indicating the error
+}
+```
+
+### SDO Abort codes
+
+- `0x10`: Unknown object index: The requested `index` is not in the object dictionary
+- `0x20`: Invalid access (unknown): The operation is not allowed due to unknown or other reasons
+  - `0x21`: Read from Write-Only object
+  - `0x22`: Write to Read-Only object
+  - `0x23`: Read start (`A`) is out of range
+  - `0x24`: Read end (`B`) is out of range
 
 ## 0x20 Cyclic request
 
