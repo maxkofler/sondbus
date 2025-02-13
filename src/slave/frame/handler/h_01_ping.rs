@@ -4,11 +4,11 @@ use crate::{
 };
 
 /// Handler for the `Ping` frame type (0x00)
-pub struct Handler00Ping {
+pub struct Handler01Ping {
     _crc: CRC8Autosar,
 }
 
-impl Handler00Ping {
+impl Handler01Ping {
     /// Create a new instance of the ping handler
     /// # Arguments
     /// * `crc` - The CRC over the received bytes
@@ -17,7 +17,7 @@ impl Handler00Ping {
     }
 }
 
-impl Handler for Handler00Ping {
+impl Handler for Handler01Ping {
     fn rx(self, _data: u8, _core: &mut SlaveCore) -> crate::slave::frame::HandlerResponse {
         todo!()
     }

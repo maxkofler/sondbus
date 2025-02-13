@@ -67,13 +67,13 @@ pub trait FrameDataHandler: Sized {
 
 #[repr(u8)]
 pub enum FrameType {
-    Ping = 0x00,
+    Ping = 0x01,
 }
 
 impl FrameType {
     pub fn from_u8(byte: u8) -> Option<Self> {
         match byte {
-            0x00 => Some(Self::Ping),
+            0x01 => Some(Self::Ping),
             _ => None,
         }
     }
