@@ -3,7 +3,7 @@ use crate::{
     slave::{frame::Handler, SlaveCore},
 };
 
-/// Handler for the `Ping` frame type (0x00)
+/// Handler for the `Ping` frame type (0x01)
 pub struct Handler01Ping {
     _crc: CRC8Autosar,
 }
