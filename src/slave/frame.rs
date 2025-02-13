@@ -26,6 +26,12 @@ pub enum SlaveState {
     WaitForCRC(Core<WaitForCRC>),
 }
 
+impl Default for SlaveState {
+    fn default() -> Self {
+        Self::WaitForStart(Core(WaitForStart {}))
+    }
+}
+
 /// A response from a handler function
 pub struct HandlerResponse {
     /// The new state to transition to
