@@ -1,4 +1,4 @@
-use handler::Handler01Ping;
+use handler::{Handler00Sync, Handler01Ping};
 
 use crate::{
     crc8::{CRC8Autosar, CRC},
@@ -8,6 +8,9 @@ use crate::{
 use super::SlaveCore;
 
 mod handler {
+    mod h_00_sync;
+    pub use h_00_sync::Handler00Sync;
+
     mod h_01_ping;
     pub use h_01_ping::Handler01Ping;
 }
@@ -84,6 +87,8 @@ impl Handler for WaitForType {
 /// Forwards incoming data to the corresponding handler to
 /// process and yield a new state.
 pub enum HandleData {
+    /// Handle the `Sync` frame type (0x00)
+    Sync(Handler00Sync),
     /// Handle the `Ping` frame type (0x01)
     Ping(Handler01Ping),
 }
@@ -91,12 +96,14 @@ pub enum HandleData {
 impl Handler for HandleData {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         match self {
+            Self::Sync(handler) => handler.rx(data, core),
             Self::Ping(handler) => handler.rx(data, core),
         }
     }
 
     fn tx(self, core: &mut SlaveCore) -> HandlerResponse {
         match self {
+            Self::Sync(handler) => handler.tx(core),
             Self::Ping(handler) => handler.tx(core),
         }
     }
@@ -153,6 +160,7 @@ impl FrameType {
     /// * `crc` - The CRC checksum up until this point
     fn to_handler(self, crc: CRC8Autosar) -> HandleData {
         match self {
+            FrameType::Sync => HandleData::Sync(Handler00Sync::new(crc)),
             FrameType::Ping => HandleData::Ping(Handler01Ping::new(crc)),
         }
     }

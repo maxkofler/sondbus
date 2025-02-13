@@ -8,6 +8,11 @@ pub mod ringbuf;
 /// The byte that marks the start of a sondbus frame
 pub const START_BYTE: u8 = 0x55;
 
+/// The byte sequence of the `SYNC` frame type (0x00)
+pub const SYNC_SEQUENCE: [u8; 15] = [
+    0x1F, 0x2E, 0x3D, 0x4C, 0x5B, 0x6A, 0x79, 0x88, 0x97, 0xA6, 0xB5, 0xC4, 0xD3, 0xE2, 0xF1,
+];
+
 /// A physical address for sondbus
 #[derive(Debug, Default, Clone)]
 pub struct PhysicalAddress {}
@@ -67,12 +72,14 @@ pub trait FrameDataHandler: Sized {
 
 #[repr(u8)]
 pub enum FrameType {
+    Sync = 0x00,
     Ping = 0x01,
 }
 
 impl FrameType {
     pub fn from_u8(byte: u8) -> Option<Self> {
         match byte {
+            0x00 => Some(Self::Sync),
             0x01 => Some(Self::Ping),
             _ => None,
         }
