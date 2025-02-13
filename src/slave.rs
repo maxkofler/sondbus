@@ -3,7 +3,9 @@ use replace_with::replace_with_or_abort_unchecked;
 
 mod frame;
 
-pub struct SlaveCore {}
+pub struct SlaveCore {
+    in_sync: bool,
+}
 
 pub struct Slave {
     state: SlaveState,

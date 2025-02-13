@@ -20,6 +20,7 @@ pub enum SlaveState {
     WaitForStart(Core<WaitForStart>),
     WaitForType(Core<WaitForType>),
     HandleData(Core<HandleData>),
+    WaitForCRC(Core<WaitForCRC>),
 }
 
 /// A response from a handler function
@@ -101,6 +102,44 @@ impl Handler for HandleData {
     }
 }
 
+/// State: Handle a incoming CRC
+///
+/// Checks that the incoming byte matches the calculated
+/// CRC and reacts in accordance to the spec:
+///
+/// If the CRC does not match, the slave is out-of-sync
+/// and falls back to the WaitForStart state.
+pub struct WaitForCRC {
+    crc: u8,
+}
+
+impl WaitForCRC {
+    pub fn new<S: Into<u8>>(crc: S) -> Self {
+        Self { crc: crc.into() }
+    }
+}
+
+impl From<CRC8Autosar> for u8 {
+    fn from(value: CRC8Autosar) -> Self {
+        value.finalize()
+    }
+}
+
+impl Handler for WaitForCRC {
+    fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
+        if data == self.crc {
+            (WaitForStart {}.into(), None).into()
+        } else {
+            core.in_sync = false;
+            (WaitForStart {}.into(), None).into()
+        }
+    }
+
+    fn tx(self, _core: &mut SlaveCore) -> HandlerResponse {
+        (self.into(), None).into()
+    }
+}
+
 //
 //
 // =================        Boilerplate code        =================
@@ -137,12 +176,19 @@ impl From<HandleData> for SlaveState {
     }
 }
 
+impl From<WaitForCRC> for SlaveState {
+    fn from(value: WaitForCRC) -> Self {
+        Self::WaitForCRC(Core(value))
+    }
+}
+
 impl Handler for SlaveState {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         match self {
             Self::WaitForStart(state) => state.0.rx(data, core),
             Self::WaitForType(state) => state.0.rx(data, core),
             Self::HandleData(state) => state.0.rx(data, core),
+            Self::WaitForCRC(state) => state.0.rx(data, core),
         }
     }
 
@@ -151,6 +197,7 @@ impl Handler for SlaveState {
             Self::WaitForStart(state) => state.0.tx(core),
             Self::WaitForType(state) => state.0.tx(core),
             Self::HandleData(state) => state.0.tx(core),
+            Self::WaitForCRC(state) => state.0.tx(core),
         }
     }
 }
