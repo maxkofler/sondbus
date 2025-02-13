@@ -25,12 +25,11 @@ In either way, all communication has to be transmitted via this channel.
 
 ## Frame layout
 
-The main difference of sondbus is, that all communication is performed in a broadcasting manner.
-This manifests itself in the frame layout in that there is only a source, but no destination address:
+The following table explains the frame format:
 
-| Start | Type | Address | Length | Data  | CRC |
-| :---: | :--: | :-----: | :----: | :---: | :-: |
-|   1   |  1   |    1    |   1    | 0-255 |  1  |
+| Start | Type | Data | CRC |
+| :---: | :--: | :--: | :-: |
+|   1   |  1   | .... |  1  |
 
 ### Start
 
@@ -40,21 +39,9 @@ The start byte is always `0x55` to indicate to the other network participants th
 
 The type of data that is transmitted in this frame, see [frame types](#frame-types).
 
-### Address
-
-The source or destination address, depending on the frame type.
-
-Address `0` is reserved for the master.
-All the other addresses are free to be assigned arbitrary values.
-
-### Length
-
-Indicates the length of the following data block.
-
 ### Data
 
-The data to be transmitted with this message.
-This can be arbitrary data or even nothing, depending on the frame type.
+The data potion of a frame contains the payload whose length and fields depend on the frame type at hand.
 
 ### CRC
 
@@ -65,8 +52,6 @@ The CRC is calculated over all the leading bytes, including:
 
 - Start
 - Type
-- Address
-- Length
 - Data
 
 ## Error handling
