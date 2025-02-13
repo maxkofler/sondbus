@@ -106,10 +106,10 @@ pub struct WaitForType {
 }
 
 impl RXHandler for WaitForType {
-    fn rx(self, data: u8, _core: &mut SlaveCore) -> HandlerResponse {
+    fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         match FrameType::from_u8(data) {
             None => (WaitForStart {}.into(), None).into(),
-            Some(ty) => (ty.to_handler(self.crc).into(), None).into(),
+            Some(ty) => ty.to_handler(self.crc).setup(core),
         }
     }
 }
@@ -124,6 +124,8 @@ impl_handler!(WaitForType);
 pub enum HandleData {
     /// Handle the `Sync` frame type (0x00)
     Sync(Handler00Sync),
+    /// Handle the `Ping` frame type (0x01)
+    Ping(Handler01Ping),
 }
 
 impl RXHandler for HandleData {
@@ -195,6 +197,15 @@ impl FrameType {
         match self {
             FrameType::Sync => HandleData::Sync(Handler00Sync::new(crc)),
             FrameType::Ping => HandleData::Ping(Handler01Ping::new(crc)),
+        }
+    }
+}
+
+impl HandleData {
+    fn setup(self, core: &mut SlaveCore) -> HandlerResponse {
+        match self {
+            Self::Ping(handler) => handler.setup(core),
+            _ => (self.into(), None).into(),
         }
     }
 }
