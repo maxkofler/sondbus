@@ -1,7 +1,7 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
     slave::{
-        frame::{HandleData, Handler, WaitForCRC, WaitForStart},
+        frame::{HandleData, RXHandler, WaitForCRC, WaitForStart},
         SlaveCore,
     },
     SYNC_SEQUENCE,
@@ -22,7 +22,7 @@ impl Handler00Sync {
     }
 }
 
-impl Handler for Handler00Sync {
+impl RXHandler for Handler00Sync {
     fn rx(mut self, data: u8, core: &mut SlaveCore) -> crate::slave::frame::HandlerResponse {
         core.in_sync = false;
 
@@ -40,9 +40,5 @@ impl Handler for Handler00Sync {
         } else {
             (WaitForStart {}.into(), None).into()
         }
-    }
-
-    fn tx(self, _core: &mut SlaveCore) -> crate::slave::frame::HandlerResponse {
-        (HandleData::Sync(self).into(), None).into()
     }
 }

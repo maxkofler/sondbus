@@ -1,4 +1,4 @@
-use frame::{Handler, SlaveState};
+use frame::{RXHandler, SlaveState, TXHandler};
 use replace_with::replace_with_or_abort_unchecked;
 
 mod frame;

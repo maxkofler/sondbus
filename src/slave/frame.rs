@@ -40,10 +40,41 @@ pub struct HandlerResponse {
     pub response: Option<u8>,
 }
 
-/// A trait for all handlers of a state
-pub trait Handler {
+pub trait RXHandler {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse;
+}
+
+macro_rules! impl_rx_noop {
+    ($x: ty) => {
+        impl RXHandler for $x {
+            fn tx(self, _core: &mut SlaveCore) -> HandlerResponse {
+                (self.into(), None).into()
+            }
+        }
+    };
+}
+
+pub trait TXHandler {
     fn tx(self, core: &mut SlaveCore) -> HandlerResponse;
+}
+
+macro_rules! impl_tx_noop {
+    ($x: ty) => {
+        impl TXHandler for $x {
+            fn tx(self, _core: &mut SlaveCore) -> HandlerResponse {
+                (self.into(), None).into()
+            }
+        }
+    };
+}
+
+/// A trait for all handlers of a state
+pub trait Handler: RXHandler + TXHandler {}
+
+macro_rules! impl_handler {
+    ($x: ty) => {
+        impl Handler for $x {}
+    };
 }
 
 /// State: Wait for start
@@ -52,7 +83,7 @@ pub trait Handler {
 /// to [WaitForType].
 pub struct WaitForStart {}
 
-impl Handler for WaitForStart {
+impl RXHandler for WaitForStart {
     fn rx(self, data: u8, _core: &mut SlaveCore) -> HandlerResponse {
         if data == START_BYTE {
             let crc = CRC8Autosar::new().update_single_move(START_BYTE);
@@ -61,11 +92,10 @@ impl Handler for WaitForStart {
             (self.into(), None).into()
         }
     }
-
-    fn tx(self, _core: &mut SlaveCore) -> HandlerResponse {
-        (self.into(), None).into()
-    }
 }
+
+impl_tx_noop!(WaitForStart);
+impl_handler!(WaitForStart);
 
 /// State: Wait for the frame type
 ///
@@ -75,18 +105,17 @@ pub struct WaitForType {
     crc: CRC8Autosar,
 }
 
-impl Handler for WaitForType {
+impl RXHandler for WaitForType {
     fn rx(self, data: u8, _core: &mut SlaveCore) -> HandlerResponse {
         match FrameType::from_u8(data) {
             None => (WaitForStart {}.into(), None).into(),
             Some(ty) => (ty.to_handler(self.crc).into(), None).into(),
         }
     }
-
-    fn tx(self, _core: &mut SlaveCore) -> HandlerResponse {
-        (self.into(), None).into()
-    }
 }
+
+impl_tx_noop!(WaitForType);
+impl_handler!(WaitForType);
 
 /// State: Handle incoming data
 ///
@@ -95,25 +124,24 @@ impl Handler for WaitForType {
 pub enum HandleData {
     /// Handle the `Sync` frame type (0x00)
     Sync(Handler00Sync),
-    /// Handle the `Ping` frame type (0x01)
-    Ping(Handler01Ping),
 }
 
-impl Handler for HandleData {
+impl RXHandler for HandleData {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         match self {
             Self::Sync(handler) => handler.rx(data, core),
-            Self::Ping(handler) => handler.rx(data, core),
-        }
-    }
-
-    fn tx(self, core: &mut SlaveCore) -> HandlerResponse {
-        match self {
-            Self::Sync(handler) => handler.tx(core),
-            Self::Ping(handler) => handler.tx(core),
+            _ => (self.into(), None).into(),
         }
     }
 }
+impl TXHandler for HandleData {
+    fn tx(self, _core: &mut SlaveCore) -> HandlerResponse {
+        match self {
+            _ => (self.into(), None).into(),
+        }
+    }
+}
+impl_handler!(HandleData);
 
 /// State: Handle a incoming CRC
 ///
@@ -138,7 +166,7 @@ impl From<CRC8Autosar> for u8 {
     }
 }
 
-impl Handler for WaitForCRC {
+impl RXHandler for WaitForCRC {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         if data == self.crc {
             (WaitForStart {}.into(), None).into()
@@ -147,11 +175,10 @@ impl Handler for WaitForCRC {
             (WaitForStart {}.into(), None).into()
         }
     }
-
-    fn tx(self, _core: &mut SlaveCore) -> HandlerResponse {
-        (self.into(), None).into()
-    }
 }
+
+impl_tx_noop!(WaitForCRC);
+impl_handler!(WaitForCRC);
 
 //
 //
@@ -196,7 +223,7 @@ impl From<WaitForCRC> for SlaveState {
     }
 }
 
-impl Handler for SlaveState {
+impl RXHandler for SlaveState {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         match self {
             Self::WaitForStart(state) => state.0.rx(data, core),
@@ -205,7 +232,9 @@ impl Handler for SlaveState {
             Self::WaitForCRC(state) => state.0.rx(data, core),
         }
     }
+}
 
+impl TXHandler for SlaveState {
     fn tx(self, core: &mut SlaveCore) -> HandlerResponse {
         match self {
             Self::WaitForStart(state) => state.0.tx(core),
@@ -215,6 +244,8 @@ impl Handler for SlaveState {
         }
     }
 }
+
+impl Handler for SlaveState {}
 
 impl From<(SlaveState, Option<u8>)> for HandlerResponse {
     fn from(value: (SlaveState, Option<u8>)) -> Self {
