@@ -66,7 +66,7 @@ As the communication is time-critical, a mismatched CRC will simply lead to the 
 There are various frame types that facilitate the sondbus communication protocol.
 
 - Management frames (`0x0_`)
-  - [`0x00` Ping](#0x00-ping)
+  - [`0x01` Ping](#0x01-ping)
 - Acyclic communication (`0x1_`)
   - [`0x10` SDO Read](#0x10-sdo-read)
   - [`0x11` SDO Response](#0x11-sdo-response)
@@ -85,7 +85,7 @@ An object is identified by its object id which is a `16-bit` unique identifier.
 Sondbus does not foresee the use of subindices to make implementations as small and easy as possible.
 Each object defines a type and a size with the maximum being `255 bytes`.
 
-## 0x00 Ping
+## 0x01 Ping
 
 This frame type allows the master to request presence information from a slave.
 The master sends this frame to the desired address and receives a mirrored response where the address is set to `0` (the master).
