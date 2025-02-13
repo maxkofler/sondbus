@@ -12,7 +12,7 @@ Table of contents
 
 - [Data Link Layer](#data-link-layer)
 - [Frame Types](#frame-types)
-- [Cyclic communication](#cyclic-communication)
+- [Unframed Response](#unframed-response)
 
 # Data Link layer
 
@@ -66,6 +66,7 @@ As the communication is time-critical, a mismatched CRC will simply lead to the 
 There are various frame types that facilitate the sondbus communication protocol.
 
 - Management frames (`0x0_`)
+  - [`0x00` Sync](#0x00-sync)
   - [`0x01` Ping](#0x01-ping)
 - Acyclic communication (`0x1_`)
   - [`0x10` SDO Read](#0x10-sdo-read)
@@ -84,6 +85,22 @@ Each sondbus slave presents an object dictionary that holds all the possible dat
 An object is identified by its object id which is a `16-bit` unique identifier.
 Sondbus does not foresee the use of subindices to make implementations as small and easy as possible.
 Each object defines a type and a size with the maximum being `255 bytes`.
+
+## 0x00 Sync
+
+The sync frame type is here to allow slaves to synchronize with the communication.
+It provides a known sequence of bytes that should be unique enough for a slave to detect it and thus sync up with the communication that is going on on the bus.
+
+The `data` section of the frame is fixed as the following 15-byte hex string:
+
+```hex
+1F 2E 3D 4C 5B 6A 79 88 97 A6 B5 C4 D3 E2 F1
+```
+
+This frame is one-way only in that there is no response from any slave to this frame as it is purely for synchronization purposes.
+
+Once a slave starts up or rejoins the communication from a fatal error, it will wait for exactly this sequence before accepting and processing further frames.
+This prevents from a slave getting out of sync and trying to handle invalid and unexpected data frames.
 
 ## 0x01 Ping
 
