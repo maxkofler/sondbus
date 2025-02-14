@@ -1,4 +1,5 @@
 use handler::{Handler00Sync, Handler01Ping};
+use response::Response01Ping;
 
 use crate::{
     crc8::{CRC8Autosar, CRC},
@@ -15,6 +16,11 @@ mod handler {
     pub use h_01_ping::Handler01Ping;
 }
 
+mod response {
+    mod r_01_ping;
+    pub use r_01_ping::Response01Ping;
+}
+
 /// The core of the slave state machine to house the slave state
 pub struct Core<S: Handler + Into<SlaveState>>(S);
 
@@ -24,6 +30,7 @@ pub enum SlaveState {
     WaitForType(Core<WaitForType>),
     HandleData(Core<HandleData>),
     WaitForCRC(Core<WaitForCRC>),
+    HandleResponse(Core<HandleResponse>),
 }
 
 impl Default for SlaveState {
@@ -109,7 +116,7 @@ impl RXHandler for WaitForType {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         match FrameType::from_u8(data) {
             None => (WaitForStart {}.into(), None).into(),
-            Some(ty) => ty.to_handler(self.crc).setup(core),
+            Some(ty) => ty.to_handler(self.crc.update_single_move(data)).setup(core),
         }
     }
 }
@@ -132,7 +139,7 @@ impl RXHandler for HandleData {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         match self {
             Self::Sync(handler) => handler.rx(data, core),
-            _ => (self.into(), None).into(),
+            Self::Ping(handler) => handler.rx(data, core),
         }
     }
 }
@@ -154,11 +161,22 @@ impl_handler!(HandleData);
 /// and falls back to the WaitForStart state.
 pub struct WaitForCRC {
     crc: u8,
+    response: Option<HandleResponse>,
 }
 
 impl WaitForCRC {
     pub fn new<S: Into<u8>>(crc: S) -> Self {
-        Self { crc: crc.into() }
+        Self {
+            crc: crc.into(),
+            response: None,
+        }
+    }
+
+    pub fn new_with_response<S: Into<u8>>(crc: S, response: HandleResponse) -> Self {
+        Self {
+            crc: crc.into(),
+            response: Some(response),
+        }
     }
 }
 
@@ -171,16 +189,46 @@ impl From<CRC8Autosar> for u8 {
 impl RXHandler for WaitForCRC {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         if data == self.crc {
-            (WaitForStart {}.into(), None).into()
+            match self.response {
+                Some(response) => response.tx(core),
+                None => (WaitForStart {}.into(), None).into(),
+            }
         } else {
             core.in_sync = false;
-            (WaitForStart {}.into(), None).into()
+            (WaitForStart {}.into(), Some(self.crc)).into()
         }
     }
 }
 
 impl_tx_noop!(WaitForCRC);
 impl_handler!(WaitForCRC);
+
+/// State: Handle incoming data
+///
+/// Forwards incoming data to the corresponding handler to
+/// process and yield a new state.
+pub enum HandleResponse {
+    /// Handle the response to the `Ping` frame type (0x01)
+    Ping(Response01Ping),
+}
+
+impl RXHandler for HandleResponse {
+    fn rx(self, _data: u8, _core: &mut SlaveCore) -> HandlerResponse {
+        match self {
+            _ => (self.into(), None).into(),
+        }
+    }
+}
+
+impl TXHandler for HandleResponse {
+    fn tx(self, core: &mut SlaveCore) -> HandlerResponse {
+        match self {
+            Self::Ping(response) => response.tx(core),
+        }
+    }
+}
+
+impl_handler!(HandleResponse);
 
 //
 //
@@ -204,7 +252,6 @@ impl FrameType {
 impl HandleData {
     fn setup(self, core: &mut SlaveCore) -> HandlerResponse {
         match self {
-            Self::Ping(handler) => handler.setup(core),
             _ => (self.into(), None).into(),
         }
     }
@@ -234,6 +281,12 @@ impl From<WaitForCRC> for SlaveState {
     }
 }
 
+impl From<HandleResponse> for SlaveState {
+    fn from(value: HandleResponse) -> Self {
+        Self::HandleResponse(Core(value))
+    }
+}
+
 impl RXHandler for SlaveState {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         match self {
@@ -241,6 +294,7 @@ impl RXHandler for SlaveState {
             Self::WaitForType(state) => state.0.rx(data, core),
             Self::HandleData(state) => state.0.rx(data, core),
             Self::WaitForCRC(state) => state.0.rx(data, core),
+            Self::HandleResponse(state) => state.0.rx(data, core),
         }
     }
 }
@@ -252,6 +306,7 @@ impl TXHandler for SlaveState {
             Self::WaitForType(state) => state.0.tx(core),
             Self::HandleData(state) => state.0.tx(core),
             Self::WaitForCRC(state) => state.0.tx(core),
+            Self::HandleResponse(state) => state.0.tx(core),
         }
     }
 }

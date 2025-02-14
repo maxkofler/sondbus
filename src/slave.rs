@@ -6,6 +6,7 @@ mod frame;
 #[derive(Default)]
 pub struct SlaveCore {
     in_sync: bool,
+    my_mac: [u8; 6],
 }
 
 pub struct Slave {
@@ -57,5 +58,9 @@ impl Slave {
         };
 
         ret
+    }
+
+    pub fn in_sync(&self) -> bool {
+        self.core.in_sync
     }
 }
