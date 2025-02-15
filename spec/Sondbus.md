@@ -68,7 +68,6 @@ There are various frame types that facilitate the sondbus communication protocol
 - Management frames (`0x0_`)
   - [`0x00` Sync](#0x00-sync)
   - [`0x01` Ping](#0x01-ping)
-  - [`0x02` Ping Response](#0x02-ping-response)
 - Acyclic communication (`0x1_`)
   - [`0x10` SDO Read](#0x10-sdo-read)
   - [`0x11` SDO Response](#0x11-sdo-response)
@@ -109,11 +108,9 @@ This frame type allows the master to request presence information from a slave.
 
 The `data` portion of the frame is 12 bytes long, containing first the 6-byte MAC address of the device being pinged and then the 6-byte MAC address of the pinging device.
 
-## 0x02 Ping response
+### Response
 
-This frame type is a response to the [`Ping` frame](#0x01-ping) by the ping'ed device.
-
-The `data` portion of the frame is 12 bytes long, containing first the 6-byte MAC address of the device that pinged and then the 6-byte MAC address of the pinged device, essentially reversing the order of the addresses in the ping frame.
+If a slave's MAC matches up with the pinged MAC, it responds with a ping frame with swapped order, inserting its MAC as the pinging device and the master's MAC as the pinged address.
 
 ## 0x10 SDO Read
 
