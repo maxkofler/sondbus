@@ -12,6 +12,7 @@ Table of contents
 
 - [Data Link Layer](#data-link-layer)
 - [Frame Types](#frame-types)
+- [Addressing](#addressing)
 - [Unframed Response](#unframed-response)
 
 # Data Link layer
@@ -77,6 +78,32 @@ There are various frame types that facilitate the sondbus communication protocol
   - [`0x21` Cyclic object configuration](#0x21-cyclic-object-configuration)
   - [`0x22` Cyclic object configuration confirm](#0x22-cyclic-object-configuration-confirm)
   - [`0x23` Cyclic object configuration reject](#0x23-cyclic-object-configuration-reject)
+
+# Addressing
+
+Sondbus has three layers of addressing:
+
+- Physical address (MAC)
+- Universe address
+- Logical address
+
+The sondbus master is free to partition the network into universes with logical addresses to bundle devices together in a way that makes sense.
+
+### Physical address
+
+The physical address is globally and universally unique to each device that can communicate using the sondbus protocol.
+It is a normal `MAC` address consisting of 6 bytes.
+
+### Universe address
+
+The sondbus protocol supports the concept of universes to expand the address space.
+This allows for more possible addresses while not fully committing to 16 bit addresses.
+The universe address is a 8-bit number.
+
+### Logical address
+
+The logical address is unique within a universe and identifies a single device or multiple functions of a device.
+The sondbus protocol does not care if a single device emulates multiple logical addresses.
 
 # Object dictionary
 
