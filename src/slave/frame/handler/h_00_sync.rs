@@ -1,7 +1,8 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
+    impl_handler, impl_tx_noop,
     slave::{
-        frame::{HandleData, RXHandler, WaitForCRC, WaitForStart},
+        frame::{Core, HandleData, RXHandler, SlaveState, WaitForCRC, WaitForStart},
         SlaveCore,
     },
     SYNC_SEQUENCE,
@@ -42,3 +43,12 @@ impl RXHandler for Handler00Sync {
         }
     }
 }
+
+impl From<Handler00Sync> for SlaveState {
+    fn from(value: Handler00Sync) -> Self {
+        SlaveState::HandleData(Core(HandleData::Sync(value)))
+    }
+}
+
+impl_tx_noop!(Handler00Sync);
+impl_handler!(Handler00Sync);

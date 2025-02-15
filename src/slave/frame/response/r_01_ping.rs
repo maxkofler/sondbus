@@ -1,5 +1,6 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
+    impl_handler, impl_rx_noop,
     slave::frame::{Core, HandleResponse, SlaveState, TXHandler, WaitForStart},
     FrameType, START_BYTE,
 };
@@ -90,3 +91,6 @@ impl From<Response01Ping> for SlaveState {
         SlaveState::HandleResponse(Core(HandleResponse::Ping(value)))
     }
 }
+
+impl_rx_noop!(Response01Ping);
+impl_handler!(Response01Ping);

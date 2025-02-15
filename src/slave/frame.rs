@@ -51,10 +51,15 @@ pub trait RXHandler {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse;
 }
 
+#[macro_export]
 macro_rules! impl_rx_noop {
     ($x: ty) => {
-        impl RXHandler for $x {
-            fn tx(self, _core: &mut SlaveCore) -> HandlerResponse {
+        impl $crate::slave::frame::RXHandler for $x {
+            fn rx(
+                self,
+                _data: u8,
+                _core: &mut $crate::slave::frame::SlaveCore,
+            ) -> $crate::slave::frame::HandlerResponse {
                 (self.into(), None).into()
             }
         }
@@ -65,10 +70,11 @@ pub trait TXHandler {
     fn tx(self, core: &mut SlaveCore) -> HandlerResponse;
 }
 
+#[macro_export]
 macro_rules! impl_tx_noop {
     ($x: ty) => {
-        impl TXHandler for $x {
-            fn tx(self, _core: &mut SlaveCore) -> HandlerResponse {
+        impl $crate::slave::frame::TXHandler for $x {
+            fn tx(self, _core: &mut SlaveCore) -> $crate::slave::frame::HandlerResponse {
                 (self.into(), None).into()
             }
         }
@@ -78,9 +84,10 @@ macro_rules! impl_tx_noop {
 /// A trait for all handlers of a state
 pub trait Handler: RXHandler + TXHandler {}
 
+#[macro_export]
 macro_rules! impl_handler {
     ($x: ty) => {
-        impl Handler for $x {}
+        impl $crate::slave::frame::Handler for $x {}
     };
 }
 

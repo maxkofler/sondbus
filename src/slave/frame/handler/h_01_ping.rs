@@ -1,6 +1,10 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
-    slave::frame::{response::Response01Ping, HandleData, HandlerResponse, RXHandler, WaitForCRC},
+    impl_handler, impl_tx_noop,
+    slave::frame::{
+        response::Response01Ping, Core, HandleData, HandlerResponse, RXHandler, SlaveState,
+        WaitForCRC,
+    },
     SlaveCore,
 };
 
@@ -142,3 +146,12 @@ impl Handler01Ping {
         }
     }
 }
+
+impl From<Handler01Ping> for SlaveState {
+    fn from(value: Handler01Ping) -> Self {
+        SlaveState::HandleData(Core(HandleData::Ping(value)))
+    }
+}
+
+impl_tx_noop!(Handler01Ping);
+impl_handler!(Handler01Ping);
