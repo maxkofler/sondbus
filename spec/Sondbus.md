@@ -72,6 +72,8 @@ There are various frame types that facilitate the sondbus communication protocol
 - Acyclic communication (`0x1_`)
   - [`0x10` SDO Read](#0x10-sdo-read)
   - [`0x11` SDO Response](#0x11-sdo-response)
+  - [`0x16` SDO Write](#0x16-sdo-write)
+  - [`0x1E` SDO Ack](#0x1e-sdo-ack)
   - [`0x1F` SDO Abort](#0x1f-sdo-abort)
 - Cyclic frame types (`0x2_`)
   - [`0x20` Cyclic request](#0x20-cyclic-request)
@@ -168,6 +170,36 @@ The frame layout is simple in that it only contains the length of the response a
 >
 > The response length can be lower than the requested length for various reasons.
 
+## 0x16 SDO Write
+
+This frame type allows a master to write an object via the SDO channel.
+The layout of the `data` section is as follows:
+
+| Universe | Address | Object Index | Start | End | Data |
+| :------: | :-----: | :----------: | :---: | :-: | :--: |
+|    u8    |   u8    |     u16      |   u8  | u8  | ...  |
+
+The `Object Index` field dictates the index of the object to be written by the master.
+The `Start` field indicates the starting position in bytes within the object to be written, while the `End` field indicates the ending position.
+This allows a master to write only a slice of the full object contents while giving the slave an indication of the amount sent by the calling device.
+
+The slave will respond with one of the following frames:
+
+- [SDO Ack](#0x1e-sdo-ack): The write was successful
+- [SDO Abort](#0x1f-sdo-abort): The write operation failed
+
+## 0x1E SDO Ack
+
+This frame type acknowledges one of the following SDO operations:
+
+- [SDO Write](#0x16-sdo-write)
+
+The `data` field contains the frame type of the operation to be acknowledged:
+
+| Frame Type |
+| :--------: |
+|     u8     |
+
 ## 0x1F SDO Abort
 
 This frame type originates from the slave and is initiated by any SDO request and indicates failure to fulfil the request by the master.
@@ -190,6 +222,7 @@ struct SDOError {
   - `0x22`: Write to Read-Only object
   - `0x23`: Read start (`Start`) is out of range
   - `0x24`: Read end (`End`) is out of range
+- `0x1xxx`: Device-specific errors
 
 ## 0x20 Cyclic request
 
