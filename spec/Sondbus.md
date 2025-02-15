@@ -143,33 +143,40 @@ If a slave's MAC matches up with the pinged MAC, it responds with a ping frame w
 
 This frame type allows the master to request object data from a slave.
 
-The address field of the request determines the slave to pull the object data from.
+The `data` field is fixed with the following parameters:
 
-The `data` field can be either 2 or 4 bytes, depending on the intention of the master:
+| Universe | Address | Object Index | Start | End |
+| :------: | :-----: | :----------: | :---: | :-: |
+|    u8    |   u8    |     u16      |   u8  | u8  |
 
-- `2`: Read the whole object: [`Index (H)`, `Index (L)`]
-- `4`: Read the object from position `A` to `B`: [`Index (H)`, `Index (L)`, `A`, `B`]
-
-The responses to this frame can be either a [SDO Response](#0x11-sdo-response) or a [SDO Abort](#0x1f-sdo-abort) if the request cannot be fulfilled.
+The `Object Index` field dictates the index of the object to be read by the master.
+The `Start` field indicates the starting position of the object to be read, while the `End` field indicates the ending position.
+This allows a master to read only a slice of the full object contents while giving the slave an indication of the amount of data expected by the calling device.
 
 ## 0x11 SDO Response
 
-This frame type originates from the slave and is initiated by a [SDO request](#0x10-sdo-read).
-It simply answers with the data requested by the master in the SDO request.
+This frame type originates from the slave and is initiated by a [SDO read](#0x10-sdo-read).
+It responds with the requested data to the requesting device.
 
-The address is `0`.
+| Length | Data |
+| :----: | :--: |
+|   u8   |  ... |
+
+The frame layout is simple in that it only contains the length of the response and the data.
+
+> [!NOTE]
+>
+> The response length can be lower than the requested length for various reasons.
 
 ## 0x1F SDO Abort
 
 This frame type originates from the slave and is initiated by any SDO request and indicates failure to fulfil the request by the master.
 
-The `address` field is `0`.
-
 The `data` field is filled with the following structure:
 
 ```rust
 struct SDOError {
-  operation: u8,    // 0 for read, 1 for write
+  operation: u8,    // 0x00 for read, 0x10 for write
   index: u16,       // The index of the object that was accessed
   abort_code: u16   // An abort code indicating the error
 }
@@ -181,8 +188,8 @@ struct SDOError {
 - `0x20`: Invalid access (unknown): The operation is not allowed due to unknown or other reasons
   - `0x21`: Read from Write-Only object
   - `0x22`: Write to Read-Only object
-  - `0x23`: Read start (`A`) is out of range
-  - `0x24`: Read end (`B`) is out of range
+  - `0x23`: Read start (`Start`) is out of range
+  - `0x24`: Read end (`End`) is out of range
 
 ## 0x20 Cyclic request
 
