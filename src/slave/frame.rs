@@ -151,9 +151,10 @@ impl RXHandler for HandleData {
     }
 }
 impl TXHandler for HandleData {
-    fn tx(self, _core: &mut SlaveCore) -> HandlerResponse {
+    fn tx(self, core: &mut SlaveCore) -> HandlerResponse {
         match self {
-            _ => (self.into(), None).into(),
+            Self::Sync(handler) => handler.tx(core),
+            Self::Ping(handler) => handler.tx(core),
         }
     }
 }
@@ -220,9 +221,9 @@ pub enum HandleResponse {
 }
 
 impl RXHandler for HandleResponse {
-    fn rx(self, _data: u8, _core: &mut SlaveCore) -> HandlerResponse {
+    fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         match self {
-            _ => (self.into(), None).into(),
+            Self::Ping(handler) => handler.rx(data, core),
         }
     }
 }
@@ -257,7 +258,7 @@ impl FrameType {
 }
 
 impl HandleData {
-    fn setup(self, core: &mut SlaveCore) -> HandlerResponse {
+    fn setup(self, _core: &mut SlaveCore) -> HandlerResponse {
         match self {
             _ => (self.into(), None).into(),
         }
