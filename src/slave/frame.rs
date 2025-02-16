@@ -9,6 +9,8 @@ use crate::{
 use super::SlaveCore;
 
 mod handler {
+    mod structure;
+
     mod array;
     pub use array::ArrayHandler;
 
