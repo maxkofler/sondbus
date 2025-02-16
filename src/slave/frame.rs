@@ -126,7 +126,9 @@ impl RXHandler for WaitForType {
     fn rx(self, data: u8, core: &mut SlaveCore) -> HandlerResponse {
         match FrameType::from_u8(data) {
             None => (WaitForStart {}.into(), None).into(),
-            Some(ty) => ty.to_handler(self.crc.update_single_move(data)).setup(core),
+            Some(ty) => ty
+                .into_handler(self.crc.update_single_move(data))
+                .setup(core),
         }
     }
 }
@@ -252,7 +254,7 @@ impl FrameType {
     /// slave [HandleData] state.
     /// # Arguments
     /// * `crc` - The CRC checksum up until this point
-    fn to_handler(self, crc: CRC8Autosar) -> HandleData {
+    fn into_handler(self, crc: CRC8Autosar) -> HandleData {
         match self {
             FrameType::Sync => HandleData::Sync(Handler00Sync::new(crc)),
             FrameType::Ping => HandleData::Ping(Handler01Ping::new(crc)),
