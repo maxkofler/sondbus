@@ -5,6 +5,8 @@ use crate::{
     FrameType, START_BYTE,
 };
 
+use super::array::{OwnedArraySender, OwnedArraySenderResult};
+
 pub enum Response01Ping {
     Start {
         mac: [u8; 6],
@@ -14,14 +16,13 @@ pub enum Response01Ping {
     },
     PingerMAC {
         crc: CRC8Autosar,
-        mac: [u8; 6],
-        pos: u8,
+        sender: OwnedArraySender<6>,
     },
     MyMAC {
         crc: CRC8Autosar,
-        pos: u8,
+        sender: OwnedArraySender<6>,
     },
-    CRC {
+    Crc {
         crc: u8,
     },
 }
@@ -39,43 +40,50 @@ impl TXHandler for Response01Ping {
             Self::Type { mac } => (
                 Self::PingerMAC {
                     crc: CRC8Autosar::new().update_move(&[START_BYTE, FrameType::Ping as u8]),
-                    mac,
-                    pos: 0,
+                    sender: OwnedArraySender::new(mac),
                 }
                 .into(),
                 Some(FrameType::Ping as u8),
             )
                 .into(),
-            Self::PingerMAC { crc, mac, pos } => {
-                let data = mac[pos as usize];
-                let crc = crc.update_single_move(data);
-                let pos = pos + 1;
 
-                if pos >= 6 {
-                    (Self::MyMAC { crc, pos: 0 }.into(), Some(data)).into()
-                } else {
-                    (Self::PingerMAC { crc, mac, pos }.into(), Some(data)).into()
+            Self::PingerMAC { crc, sender } => {
+                let (state, res) = sender.handle();
+                let crc = crc.update_single_move(res);
+
+                match state {
+                    OwnedArraySenderResult::Continue(sender) => {
+                        let s = Self::PingerMAC { crc, sender };
+                        (HandleResponse::Ping(s).into(), Some(res)).into()
+                    }
+                    OwnedArraySenderResult::Done => {
+                        let s = Self::MyMAC {
+                            crc,
+                            sender: OwnedArraySender::new(core.my_mac),
+                        };
+                        (HandleResponse::Ping(s).into(), Some(res)).into()
+                    }
                 }
             }
-            Self::MyMAC { crc, pos } => {
-                let data = core.my_mac[pos as usize];
-                let crc = crc.update_single_move(data);
-                let pos = pos + 1;
 
-                if pos >= 6 {
-                    (
-                        Self::CRC {
+            Self::MyMAC { crc, sender } => {
+                let (state, res) = sender.handle();
+                let crc = crc.update_single_move(res);
+
+                match state {
+                    OwnedArraySenderResult::Continue(sender) => {
+                        let s = Self::MyMAC { crc, sender };
+                        (HandleResponse::Ping(s).into(), Some(res)).into()
+                    }
+                    OwnedArraySenderResult::Done => {
+                        let s = Self::Crc {
                             crc: crc.finalize(),
-                        }
-                        .into(),
-                        Some(data),
-                    )
-                        .into()
-                } else {
-                    (Self::MyMAC { crc, pos }.into(), Some(data)).into()
+                        };
+                        (HandleResponse::Ping(s).into(), Some(res)).into()
+                    }
                 }
             }
-            Self::CRC { crc } => (WaitForStart {}.into(), Some(crc)).into(),
+            Self::Crc { crc } => (WaitForStart {}.into(), Some(crc)).into(),
         }
     }
 }
