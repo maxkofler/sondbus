@@ -8,16 +8,22 @@ use crate::{
     SlaveCore,
 };
 
+use super::{array::ArrayHandlerResult, ArrayHandler};
+
 /// Handler for the `Ping` frame type (0x01)
 pub enum Handler01Ping {
-    HandleMyAddress { crc: CRC8Autosar, index: u8 },
-    HandlePinger1 { crc: CRC8Autosar },
-    HandlePinger2 { crc: CRC8Autosar, mac: [u8; 1] },
-    HandlePinger3 { crc: CRC8Autosar, mac: [u8; 2] },
-    HandlePinger4 { crc: CRC8Autosar, mac: [u8; 3] },
-    HandlePinger5 { crc: CRC8Autosar, mac: [u8; 4] },
-    HandlePinger6 { crc: CRC8Autosar, mac: [u8; 5] },
-    Skip { crc: CRC8Autosar, remainder: u8 },
+    HandleMyAddress {
+        crc: CRC8Autosar,
+        index: u8,
+    },
+    HandlePinger {
+        crc: CRC8Autosar,
+        array: ArrayHandler<6>,
+    },
+    Skip {
+        crc: CRC8Autosar,
+        remainder: u8,
+    },
 }
 
 impl Handler01Ping {
@@ -36,71 +42,20 @@ impl RXHandler for Handler01Ping {
                 Self::handle_wait_for_my_address(data, core, crc, index)
             }
 
-            // Handle the 1st octet of the sender
-            Self::HandlePinger1 { crc } => (
-                HandleData::Ping(Self::HandlePinger2 {
-                    crc: crc.update_single_move(data),
-                    mac: [data],
-                })
-                .into(),
-                None,
-            )
-                .into(),
-
-            // Handle the 2nd octet of the sender
-            Self::HandlePinger2 { crc, mac } => (
-                HandleData::Ping(Self::HandlePinger3 {
-                    crc: crc.update_single_move(data),
-                    mac: [mac[0], data],
-                })
-                .into(),
-                None,
-            )
-                .into(),
-
-            // Handle the 3rd octet of the sender
-            Self::HandlePinger3 { crc, mac } => (
-                HandleData::Ping(Self::HandlePinger4 {
-                    crc: crc.update_single_move(data),
-                    mac: [mac[0], mac[1], data],
-                })
-                .into(),
-                None,
-            )
-                .into(),
-
-            // Handle the 4th octet of the sender
-            Self::HandlePinger4 { crc, mac } => (
-                HandleData::Ping(Self::HandlePinger5 {
-                    crc: crc.update_single_move(data),
-                    mac: [mac[0], mac[1], mac[2], data],
-                })
-                .into(),
-                None,
-            )
-                .into(),
-
-            // Handle the 5th octet of the sender
-            Self::HandlePinger5 { crc, mac } => (
-                HandleData::Ping(Self::HandlePinger6 {
-                    crc: crc.update_single_move(data),
-                    mac: [mac[0], mac[1], mac[2], mac[3], data],
-                })
-                .into(),
-                None,
-            )
-                .into(),
-
-            // Handle the 6th octet of the sender
-            Self::HandlePinger6 { crc, mac } => (
-                WaitForCRC::new_with_response(
-                    crc.update_single_move(data),
-                    Response01Ping::new([mac[0], mac[1], mac[2], mac[3], mac[4], data]).into(),
-                )
-                .into(),
-                None,
-            )
-                .into(),
+            Self::HandlePinger { crc, array } => {
+                let crc = crc.update_single_move(data);
+                match array.handle(data) {
+                    ArrayHandlerResult::Continue(array) => {
+                        let s = Self::HandlePinger { crc, array };
+                        (HandleData::Ping(s).into(), None).into()
+                    }
+                    ArrayHandlerResult::Done(mac) => (
+                        WaitForCRC::new_with_response(crc, Response01Ping::new(mac).into()).into(),
+                        None,
+                    )
+                        .into(),
+                }
+            }
 
             Self::Skip { crc, remainder } => Self::handle_skip(data, crc, remainder),
         }
@@ -118,7 +73,10 @@ impl Handler01Ping {
 
         let s = if core.my_mac[index as usize] == data {
             if index >= 5 {
-                Self::HandlePinger1 { crc }
+                Self::HandlePinger {
+                    crc,
+                    array: ArrayHandler::default(),
+                }
             } else {
                 Self::HandleMyAddress {
                     crc,
