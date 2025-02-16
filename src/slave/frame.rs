@@ -9,6 +9,9 @@ use crate::{
 use super::SlaveCore;
 
 mod handler {
+    mod array;
+    pub use array::ArrayHandler;
+
     mod h_00_sync;
     pub use h_00_sync::Handler00Sync;
 
