@@ -61,6 +61,12 @@ pub struct CRC8Autosar {
     pub crc: u8,
 }
 
+impl Default for CRC8Autosar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CRC<u8> for CRC8Autosar {
     fn new() -> Self {
         Self {
