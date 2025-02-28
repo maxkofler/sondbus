@@ -8,7 +8,7 @@ use crate::{
     SlaveCore,
 };
 
-use super::{array::ArrayHandlerResult, ArrayHandler};
+use super::{array::OwnedArrayHandlerResult, OwnedArrayHandler};
 
 /// Handler for the `Ping` frame type (0x01)
 pub enum Handler01Ping {
@@ -18,7 +18,7 @@ pub enum Handler01Ping {
     },
     HandlePinger {
         crc: CRC8Autosar,
-        array: ArrayHandler<6>,
+        array: OwnedArrayHandler<6>,
     },
     Skip {
         crc: CRC8Autosar,
@@ -45,11 +45,11 @@ impl RXHandler for Handler01Ping {
             Self::HandlePinger { crc, array } => {
                 let crc = crc.update_single_move(data);
                 match array.handle(data) {
-                    ArrayHandlerResult::Continue(array) => {
+                    OwnedArrayHandlerResult::Continue(array) => {
                         let s = Self::HandlePinger { crc, array };
                         (HandleData::Ping(s).into(), None).into()
                     }
-                    ArrayHandlerResult::Done(mac) => (
+                    OwnedArrayHandlerResult::Done(mac) => (
                         WaitForCRC::new_with_response(crc, Response01Ping::new(mac).into()).into(),
                         None,
                     )
@@ -75,7 +75,7 @@ impl Handler01Ping {
             if index >= 5 {
                 Self::HandlePinger {
                     crc,
-                    array: ArrayHandler::default(),
+                    array: OwnedArrayHandler::default(),
                 }
             } else {
                 Self::HandleMyAddress {

@@ -12,7 +12,7 @@ mod handler {
     mod structure;
 
     mod array;
-    pub use array::ArrayHandler;
+    pub use array::OwnedArrayHandler;
 
     mod h_00_sync;
     pub use h_00_sync::Handler00Sync;
