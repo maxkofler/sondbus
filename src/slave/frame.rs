@@ -23,6 +23,7 @@ mod handler {
 
 mod response {
     mod array;
+    mod structure;
 
     mod r_01_ping;
     pub use r_01_ping::Response01Ping;
