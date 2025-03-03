@@ -136,6 +136,39 @@ The `data` portion of the frame is 12 bytes long, containing first the 6-byte MA
 
 If a slave's MAC matches up with the pinged MAC, it responds with a ping frame with swapped order, inserting its MAC as the pinging device and the master's MAC as the pinged address.
 
+## 0x02 Slave Configuration
+
+This frame encloses a bunch of other frames that allow a master to configure slaves.
+
+The `data` field is fixed as the following structure, the enclosed `payload` section can vary and depends on the `command` field:
+
+```rust
+struct SlaveConfiguration {
+  mac: [u8; 6],
+  command: u8,
+  payload: [u8; ...]
+}
+```
+
+Following commands are available:
+
+- [`0x10` Address](#0x02---0x10-address): Configure the addresses of a slave
+
+### 0x02 - 0x10 Address
+
+---
+
+This command allows the master to set addressing information for the commanded slave.
+
+The `payload` holds the following fixed structure:
+
+```rust
+struct Address {
+  universe: u8,
+  address: u8,
+}
+```
+
 ## 0x10 SDO Read
 
 This frame type allows the master to request object data from a slave.
