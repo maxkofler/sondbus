@@ -1,6 +1,8 @@
 mod core;
 mod state;
 
+mod rx;
+
 #[derive(Default, Debug)]
 pub struct SlaveFrame {
     state: state::State,
