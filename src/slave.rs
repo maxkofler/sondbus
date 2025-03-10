@@ -1,4 +1,4 @@
-use frame::{RXHandler, SlaveState, TXHandler};
+use frame::SlaveFrame;
 use replace_with::replace_with_or_abort_unchecked;
 
 mod frame;
@@ -10,7 +10,7 @@ pub struct SlaveCore {
 }
 
 pub struct Slave {
-    state: SlaveState,
+    state: SlaveFrame,
     core: SlaveCore,
 }
 
@@ -18,7 +18,7 @@ impl Slave {
     /// Create a new slave
     pub fn new() -> Self {
         Self {
-            state: SlaveState::default(),
+            state: SlaveFrame::default(),
             core: SlaveCore::default(),
         }
     }
@@ -33,9 +33,9 @@ impl Slave {
 
         unsafe {
             replace_with_or_abort_unchecked(&mut self.state, |state| {
-                let response = state.rx(byte, &mut self.core);
-                ret = response.response;
-                response.state
+                let response = state.rx(byte);
+                ret = response.1;
+                response.0
             })
         };
 
@@ -49,13 +49,13 @@ impl Slave {
     pub fn tx(&mut self) -> Option<u8> {
         let mut ret = None;
 
-        unsafe {
+        /*unsafe {
             replace_with_or_abort_unchecked(&mut self.state, |state| {
                 let response = state.tx(&mut self.core);
                 ret = response.response;
                 response.state
             })
-        };
+        };*/
 
         ret
     }
