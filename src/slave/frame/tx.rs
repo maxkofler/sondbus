@@ -3,7 +3,7 @@ pub use tx_01_ping::TX01Ping;
 
 use super::Receiver;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TXType {
     Ping(TX01Ping),
 }

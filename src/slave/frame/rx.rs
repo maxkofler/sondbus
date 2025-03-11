@@ -4,11 +4,14 @@ pub use rx_00_sync::RX00Sync;
 mod rx_01_ping;
 pub use rx_01_ping::RX01Ping;
 
+mod rx_struct;
+pub use rx_struct::*;
+
 use crate::FrameType;
 
 use super::{state::State, Receiver, Response};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum RXType {
     Sync(RX00Sync),
     Ping(RX01Ping),

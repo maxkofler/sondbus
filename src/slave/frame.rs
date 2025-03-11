@@ -25,6 +25,15 @@ pub struct Response {
     response: Option<u8>,
 }
 
+impl Response {
+    pub fn from_state(state: state::State) -> Self {
+        Self {
+            state,
+            response: None,
+        }
+    }
+}
+
 pub trait Receiver {
     fn rx(self, data: u8, core: &mut core::Core) -> Response;
 }

@@ -3,7 +3,7 @@ use crate::{
     slave::frame::{core::Core, state::State, Receiver, Response},
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct RX01Ping {}
 
 impl Receiver for RX01Ping {

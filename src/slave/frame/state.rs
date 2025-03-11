@@ -5,7 +5,7 @@ use crate::{
 
 use super::{core::Core, rx::RXType, tx::TXType, Receiver, Response};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub enum State {
     /// Wait for the start byte to be received before
     /// proceeding to the next state

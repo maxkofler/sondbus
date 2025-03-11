@@ -2,7 +2,7 @@ use crate::{impl_receiver_nop, slave::frame::state::State};
 
 use super::TXType;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TX01Ping {}
 
 impl From<TX01Ping> for State {
