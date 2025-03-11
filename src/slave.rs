@@ -3,15 +3,8 @@ use replace_with::replace_with_or_abort_unchecked;
 
 mod frame;
 
-#[derive(Default)]
-pub struct SlaveCore {
-    in_sync: bool,
-    my_mac: [u8; 6],
-}
-
 pub struct Slave {
     state: SlaveFrame,
-    core: SlaveCore,
 }
 
 impl Slave {
@@ -19,7 +12,6 @@ impl Slave {
     pub fn new() -> Self {
         Self {
             state: SlaveFrame::default(),
-            core: SlaveCore::default(),
         }
     }
 
