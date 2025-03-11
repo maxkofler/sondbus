@@ -1,6 +1,9 @@
 mod tx_01_ping;
 pub use tx_01_ping::TX01Ping;
 
+mod tx_struct;
+pub use tx_struct::*;
+
 use super::Receiver;
 
 #[derive(Debug, PartialEq)]
