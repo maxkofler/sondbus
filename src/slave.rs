@@ -49,13 +49,13 @@ impl Slave {
     pub fn tx(&mut self) -> Option<u8> {
         let mut ret = None;
 
-        /*unsafe {
+        unsafe {
             replace_with_or_abort_unchecked(&mut self.state, |state| {
-                let response = state.tx(&mut self.core);
-                ret = response.response;
-                response.state
+                let response = state.tx();
+                ret = response.1;
+                response.0
             })
-        };*/
+        };
 
         ret
     }

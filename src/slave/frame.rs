@@ -18,6 +18,14 @@ impl SlaveFrame {
 
         (self, response.response)
     }
+
+    pub fn tx(mut self) -> (Self, Option<u8>) {
+        let response = self.state.tx(&mut self.core);
+
+        self.state = response.state;
+
+        (self, response.response)
+    }
 }
 
 pub struct Response {

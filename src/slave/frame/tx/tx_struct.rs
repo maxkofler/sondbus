@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
 /// A handler to send a structure owned by the handler
+#[derive(Debug, PartialEq)]
 pub struct OwnedStructSender<T> {
     data: T,
     pos: usize,

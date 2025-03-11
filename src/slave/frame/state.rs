@@ -3,7 +3,7 @@ use crate::{
     FrameType, START_BYTE,
 };
 
-use super::{core::Core, rx::RXType, tx::TXType, Receiver, Response};
+use super::{core::Core, rx::RXType, tx::TXType, Receiver, Response, Sender};
 
 #[derive(Default, Debug, PartialEq)]
 pub enum State {
@@ -18,8 +18,11 @@ pub enum State {
     /// Waits for the CRC and proceeds to handling the
     /// response if it is valid
     WaitForCRC(Option<TXType>),
+    SendResponseStart(TXType),
+    SendResponseType(TXType),
     /// Handles the response to be put on the bus
     HandleTX(TXType),
+    SendResponseCRC,
 }
 
 impl Receiver for State {
@@ -61,9 +64,11 @@ impl Receiver for State {
             // Wait for the CRC of the whole data.
             // If we have a CRC error, the sync is lost
             State::WaitForCRC(r) => {
-                if core.crc.finalize() == data {
+                let crc = core.crc.finalize();
+                core.crc = Default::default();
+                if crc == data {
                     match r {
-                        Some(r) => State::HandleTX(r).into(),
+                        Some(r) => State::SendResponseStart(r).tx(core),
                         None => State::WaitForStart.into(),
                     }
                 } else {
@@ -75,6 +80,37 @@ impl Receiver for State {
 
             // Send the response data to the bus
             State::HandleTX(v) => v.rx(data, core),
+
+            _ => Response::from_state(self),
+        }
+    }
+}
+
+impl Sender for State {
+    fn tx(self, core: &mut super::core::Core) -> Response {
+        match self {
+            State::SendResponseStart(v) => {
+                core.crc.update_single(START_BYTE);
+                Response {
+                    state: State::SendResponseType(v),
+                    response: Some(START_BYTE),
+                }
+            }
+
+            State::SendResponseType(v) => {
+                let ty = v.to_frame_type() as u8;
+                core.crc.update_single(ty);
+                Response {
+                    state: State::HandleTX(v),
+                    response: Some(ty),
+                }
+            }
+            Self::HandleTX(v) => v.tx(core),
+            State::SendResponseCRC => Response {
+                state: Self::WaitForStart,
+                response: Some(core.crc.finalize()),
+            },
+            _ => Response::from_state(self),
         }
     }
 }
