@@ -3,7 +3,7 @@ use crate::{
     FrameType, START_BYTE,
 };
 
-use super::{core::Core, rx::RX00Sync, Receiver, Response};
+use super::{core::Core, rx::RXType, tx::TXType, Receiver, Response};
 
 #[derive(Default, Debug)]
 pub enum State {
@@ -17,37 +17,9 @@ pub enum State {
     HandleRX(RXType),
     /// Waits for the CRC and proceeds to handling the
     /// response if it is valid
-    WaitForCRC,
+    WaitForCRC(Option<TXType>),
     /// Handles the response to be put on the bus
-    HandleTX,
-}
-
-#[derive(Debug)]
-pub enum RXType {
-    Sync(RX00Sync),
-}
-
-impl Receiver for RXType {
-    fn rx(self, data: u8, core: &mut super::core::Core) -> Response {
-        match self {
-            Self::Sync(v) => v.rx(data, core),
-        }
-    }
-}
-
-impl From<RXType> for State {
-    fn from(value: RXType) -> Self {
-        State::HandleRX(value)
-    }
-}
-
-impl FrameType {
-    fn to_rx_type(self) -> RXType {
-        match self {
-            FrameType::Sync => RXType::Sync(RX00Sync::default()),
-            FrameType::Ping => todo!(),
-        }
-    }
+    HandleTX(TXType),
 }
 
 impl Receiver for State {
@@ -72,7 +44,7 @@ impl Receiver for State {
                 core.crc.update_single(data);
                 match FrameType::from_u8(data) {
                     Some(v) => {
-                        let state: State = v.to_rx_type().into();
+                        let state: State = RXType::from(v).into();
                         state.into()
                     }
                     None => {
@@ -88,9 +60,12 @@ impl Receiver for State {
 
             // Wait for the CRC of the whole data.
             // If we have a CRC error, the sync is lost
-            State::WaitForCRC => {
+            State::WaitForCRC(r) => {
                 if core.crc.finalize() == data {
-                    State::HandleTX.into()
+                    match r {
+                        Some(r) => State::HandleTX(r).into(),
+                        None => State::WaitForStart.into(),
+                    }
                 } else {
                     // If we have a CRC error, we're out of sync
                     core.in_sync = false;
@@ -99,7 +74,7 @@ impl Receiver for State {
             }
 
             // Send the response data to the bus
-            State::HandleTX => Self::WaitForStart.into(),
+            State::HandleTX(v) => v.rx(data, core),
         }
     }
 }

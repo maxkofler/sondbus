@@ -4,9 +4,9 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-pub struct RX00Sync {}
+pub struct RX01Ping {}
 
-impl Receiver for RX00Sync {
+impl Receiver for RX01Ping {
     fn rx(self, data: u8, core: &mut Core) -> Response {
         core.crc.update_single(data);
 
