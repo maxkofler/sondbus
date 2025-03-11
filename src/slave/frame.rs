@@ -7,7 +7,7 @@ mod tx;
 #[derive(Default, Debug)]
 pub struct SlaveFrame {
     state: state::State,
-    core: core::Core,
+    pub core: core::Core,
 }
 
 impl SlaveFrame {

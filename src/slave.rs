@@ -61,6 +61,6 @@ impl Slave {
     }
 
     pub fn in_sync(&self) -> bool {
-        self.core.in_sync
+        self.state.core.in_sync
     }
 }
