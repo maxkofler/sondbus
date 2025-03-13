@@ -4,9 +4,9 @@ pub use tx_01_ping::TX01Ping;
 mod tx_struct;
 pub use tx_struct::*;
 
-use crate::FrameType;
+use crate::{Callbacks, FrameType};
 
-use super::{Receiver, Sender};
+use super::{core::Core, Receiver, Response, Sender};
 
 #[derive(Debug, PartialEq)]
 pub enum TXType {
@@ -22,17 +22,17 @@ impl TXType {
 }
 
 impl Receiver for TXType {
-    fn rx(self, data: u8, core: &mut super::core::Core) -> super::Response {
+    fn rx(self, data: u8, core: &mut Core, callbacks: &mut Callbacks) -> Response {
         match self {
-            Self::Ping(v) => v.rx(data, core),
+            Self::Ping(v) => v.rx(data, core, callbacks),
         }
     }
 }
 
 impl Sender for TXType {
-    fn tx(self, core: &mut super::core::Core) -> super::Response {
+    fn tx(self, core: &mut Core, callbacks: &mut Callbacks) -> Response {
         match self {
-            Self::Ping(v) => v.tx(core),
+            Self::Ping(v) => v.tx(core, callbacks),
         }
     }
 }

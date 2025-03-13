@@ -7,9 +7,9 @@ pub use rx_01_ping::RX01Ping;
 mod rx_struct;
 pub use rx_struct::*;
 
-use crate::FrameType;
+use crate::{Callbacks, FrameType};
 
-use super::{state::State, Receiver, Response};
+use super::{core::Core, state::State, Receiver, Response};
 
 #[derive(Debug, PartialEq)]
 pub enum RXType {
@@ -18,10 +18,10 @@ pub enum RXType {
 }
 
 impl Receiver for RXType {
-    fn rx(self, data: u8, core: &mut super::core::Core) -> Response {
+    fn rx(self, data: u8, core: &mut Core, callbacks: &mut Callbacks) -> Response {
         match self {
-            Self::Sync(v) => v.rx(data, core),
-            Self::Ping(v) => v.rx(data, core),
+            Self::Sync(v) => v.rx(data, core, callbacks),
+            Self::Ping(v) => v.rx(data, core, callbacks),
         }
     }
 }

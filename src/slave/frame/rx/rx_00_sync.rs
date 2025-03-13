@@ -1,7 +1,7 @@
 use crate::{
     crc8::CRC,
     slave::frame::{core::Core, state::State, Receiver, Response},
-    SYNC_SEQUENCE,
+    Callbacks, SYNC_SEQUENCE,
 };
 
 use super::{OwnedStructReceiver, OwnedStructReceiverResult, RXType};
@@ -12,7 +12,7 @@ pub struct RX00Sync {
 }
 
 impl Receiver for RX00Sync {
-    fn rx(self, data: u8, core: &mut Core) -> Response {
+    fn rx(self, data: u8, core: &mut Core, _callbacks: &mut Callbacks) -> Response {
         core.crc.update_single(data);
 
         match self.receiver.rx(data) {

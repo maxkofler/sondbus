@@ -23,12 +23,12 @@ impl Slave {
     /// * `byte` - The received byte
     /// # Returns
     /// A byte to send to the bus, if some
-    pub fn rx(&mut self, byte: u8) -> Option<u8> {
+    pub fn rx(&mut self, byte: u8, callbacks: &mut Callbacks) -> Option<u8> {
         let mut ret = None;
 
         unsafe {
             replace_with_or_abort_unchecked(&mut self.state, |state| {
-                let response = state.rx(byte);
+                let response = state.rx(byte, callbacks);
                 ret = response.1;
                 response.0
             })
@@ -41,12 +41,12 @@ impl Slave {
     /// to put on the bus
     /// # Returns
     /// A byte to send to the bus, if some
-    pub fn tx(&mut self) -> Option<u8> {
+    pub fn tx(&mut self, callbacks: &mut Callbacks) -> Option<u8> {
         let mut ret = None;
 
         unsafe {
             replace_with_or_abort_unchecked(&mut self.state, |state| {
-                let response = state.tx();
+                let response = state.tx(callbacks);
                 ret = response.1;
                 response.0
             })

@@ -26,7 +26,7 @@ pub enum State {
 }
 
 impl Receiver for State {
-    fn rx(self, data: u8, core: &mut Core) -> Response {
+    fn rx(self, data: u8, core: &mut Core, callbacks: &mut super::Callbacks) -> Response {
         match self {
             // Wait for the start byte to arrive at the bus
             // and transition to the next state.
@@ -59,7 +59,7 @@ impl Receiver for State {
             }
 
             // Handle incoming bytes of a specific frame type
-            State::HandleRX(state) => state.rx(data, core),
+            State::HandleRX(state) => state.rx(data, core, callbacks),
 
             // Wait for the CRC of the whole data.
             // If we have a CRC error, the sync is lost
@@ -68,7 +68,7 @@ impl Receiver for State {
                 core.crc = Default::default();
                 if crc == data {
                     match r {
-                        Some(r) => State::SendResponseStart(r).tx(core),
+                        Some(r) => State::SendResponseStart(r).tx(core, callbacks),
                         None => State::WaitForStart.into(),
                     }
                 } else {
@@ -79,7 +79,7 @@ impl Receiver for State {
             }
 
             // Send the response data to the bus
-            State::HandleTX(v) => v.rx(data, core),
+            State::HandleTX(v) => v.rx(data, core, callbacks),
 
             _ => Response::from_state(self),
         }
@@ -87,7 +87,7 @@ impl Receiver for State {
 }
 
 impl Sender for State {
-    fn tx(self, core: &mut super::core::Core) -> Response {
+    fn tx(self, core: &mut super::core::Core, callbacks: &mut super::Callbacks) -> Response {
         match self {
             State::SendResponseStart(v) => {
                 core.crc.update_single(START_BYTE);
@@ -105,7 +105,7 @@ impl Sender for State {
                     response: Some(ty),
                 }
             }
-            Self::HandleTX(v) => v.tx(core),
+            Self::HandleTX(v) => v.tx(core, callbacks),
             State::SendResponseCRC => Response {
                 state: Self::WaitForStart,
                 response: Some(core.crc.finalize()),

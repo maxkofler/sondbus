@@ -2,6 +2,7 @@ use crate::{
     crc8::CRC,
     impl_receiver_nop,
     slave::frame::{core::Core, state::State, Response, Sender},
+    Callbacks,
 };
 
 use super::{OwnedStructSender, OwnedStructSenderResult, TXType};
@@ -26,7 +27,7 @@ impl From<TX01Ping> for State {
 impl_receiver_nop!(TX01Ping);
 
 impl Sender for TX01Ping {
-    fn tx(self, core: &mut crate::slave::frame::core::Core) -> crate::slave::frame::Response {
+    fn tx(self, core: &mut Core, _callbacks: &mut Callbacks) -> Response {
         let (state, response) = self.sender.tx();
 
         core.crc.update_single(response);

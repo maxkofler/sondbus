@@ -1,3 +1,5 @@
+use super::Callbacks;
+
 mod core;
 mod state;
 
@@ -11,16 +13,16 @@ pub struct SlaveFrame {
 }
 
 impl SlaveFrame {
-    pub fn rx(mut self, data: u8) -> (Self, Option<u8>) {
-        let response = self.state.rx(data, &mut self.core);
+    pub fn rx(mut self, data: u8, callbacks: &mut Callbacks) -> (Self, Option<u8>) {
+        let response = self.state.rx(data, &mut self.core, callbacks);
 
         self.state = response.state;
 
         (self, response.response)
     }
 
-    pub fn tx(mut self) -> (Self, Option<u8>) {
-        let response = self.state.tx(&mut self.core);
+    pub fn tx(mut self, callbacks: &mut Callbacks) -> (Self, Option<u8>) {
+        let response = self.state.tx(&mut self.core, callbacks);
 
         self.state = response.state;
 
@@ -43,7 +45,7 @@ impl Response {
 }
 
 pub trait Receiver {
-    fn rx(self, data: u8, core: &mut core::Core) -> Response;
+    fn rx(self, data: u8, core: &mut core::Core, callbacks: &mut Callbacks) -> Response;
 }
 
 #[macro_export]
@@ -54,6 +56,7 @@ macro_rules! impl_receiver_nop {
                 self,
                 _data: u8,
                 _core: &mut $crate::slave::frame::core::Core,
+                _callbacks: &mut $crate::slave::frame::Callbacks,
             ) -> $crate::slave::frame::Response {
                 $crate::slave::frame::Response {
                     state: self.into(),
@@ -65,7 +68,7 @@ macro_rules! impl_receiver_nop {
 }
 
 pub trait Sender {
-    fn tx(self, core: &mut core::Core) -> Response;
+    fn tx(self, core: &mut core::Core, callbacks: &mut Callbacks) -> Response;
 }
 
 #[macro_export]
@@ -75,6 +78,7 @@ macro_rules! impl_sender_nop {
             fn tx(
                 self,
                 _core: &mut $crate::slave::frame::core::Core,
+                _callbacks: &mut $crate::slave::frame::Callbacks,
             ) -> $crate::slave::frame::Response {
                 $crate::slave::frame::Response {
                     state: self.into(),

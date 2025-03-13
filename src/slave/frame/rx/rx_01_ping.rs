@@ -6,6 +6,7 @@ use crate::{
         tx::{TX01Ping, TXType},
         Receiver, Response,
     },
+    Callbacks,
 };
 
 use super::{OwnedStructReceiver, OwnedStructReceiverResult, RXType};
@@ -23,7 +24,7 @@ struct Ping {
 }
 
 impl Receiver for RX01Ping {
-    fn rx(self, data: u8, core: &mut Core) -> Response {
+    fn rx(self, data: u8, core: &mut Core, _callbacks: &mut Callbacks) -> Response {
         core.crc.update_single(data);
 
         match self.receiver.rx(data) {
