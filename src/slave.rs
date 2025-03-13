@@ -1,6 +1,9 @@
 use frame::SlaveFrame;
 use replace_with::replace_with_or_abort_unchecked;
 
+mod callbacks;
+pub use callbacks::*;
+
 mod frame;
 
 pub struct Slave {
