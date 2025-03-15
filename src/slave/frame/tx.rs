@@ -4,6 +4,9 @@ pub use tx_01_ping::TX01Ping;
 mod tx_struct;
 pub use tx_struct::*;
 
+mod tx_array;
+pub use tx_array::*;
+
 use crate::{Callbacks, FrameType};
 
 use super::{core::Core, Receiver, Response, Sender};
