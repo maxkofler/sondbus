@@ -6,6 +6,9 @@ pub use callbacks::*;
 
 mod frame;
 
+/// The size to allocate for an object buffer
+pub type ObjectBuffer = [u8; 32];
+
 pub struct Slave {
     state: SlaveFrame,
 }
