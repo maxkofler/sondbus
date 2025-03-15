@@ -74,6 +74,9 @@ pub trait FrameDataHandler: Sized {
 pub enum FrameType {
     Sync = 0x00,
     Ping = 0x01,
+    SDORead = 0x10,
+    SDOResponse = 0x11,
+    SDOAbort = 0x1F,
 }
 
 impl FrameType {
@@ -81,6 +84,8 @@ impl FrameType {
         match byte {
             0x00 => Some(Self::Sync),
             0x01 => Some(Self::Ping),
+            0x10 => Some(Self::SDORead),
+            0x11 => Some(Self::SDORead),
             _ => None,
         }
     }

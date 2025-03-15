@@ -6,6 +6,8 @@ mod state;
 mod rx;
 mod tx;
 
+mod sdo;
+
 #[derive(Default, Debug)]
 pub struct SlaveFrame {
     state: state::State,
