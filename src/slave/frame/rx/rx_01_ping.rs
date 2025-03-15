@@ -9,11 +9,12 @@ use crate::{
     Callbacks,
 };
 
-use super::{OwnedStructReceiver, OwnedStructReceiverResult, RXType};
+use super::{RXType, StructReceiver, StructReceiverResult};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct RX01Ping {
-    receiver: OwnedStructReceiver<Ping>,
+    structure: Ping,
+    receiver: StructReceiver,
 }
 
 #[repr(align(1))]
@@ -24,16 +25,21 @@ struct Ping {
 }
 
 impl Receiver for RX01Ping {
-    fn rx(self, data: u8, core: &mut Core, _callbacks: &mut Callbacks) -> Response {
+    fn rx(mut self, data: u8, core: &mut Core, _callbacks: &mut Callbacks) -> Response {
         core.crc.update_single(data);
 
-        match self.receiver.rx(data) {
-            OwnedStructReceiverResult::Continue(receiver) => {
-                Response::from_state(Self { receiver }.into())
-            }
-            OwnedStructReceiverResult::Done(v) => {
-                if v.dst == core.my_mac {
-                    State::WaitForCRC(Some(TXType::Ping(TX01Ping::new(v.src, core)))).into()
+        match self.receiver.rx(data, &mut self.structure) {
+            StructReceiverResult::Continue(receiver) => Response::from_state(
+                Self {
+                    structure: self.structure,
+                    receiver,
+                }
+                .into(),
+            ),
+            StructReceiverResult::Done => {
+                if self.structure.dst == core.my_mac {
+                    State::WaitForCRC(Some(TXType::Ping(TX01Ping::new(self.structure.src, core))))
+                        .into()
                 } else {
                     State::WaitForCRC(None).into()
                 }
@@ -45,13 +51,5 @@ impl Receiver for RX01Ping {
 impl From<RX01Ping> for State {
     fn from(value: RX01Ping) -> Self {
         Self::HandleRX(RXType::Ping(value))
-    }
-}
-
-impl Default for RX01Ping {
-    fn default() -> Self {
-        Self {
-            receiver: OwnedStructReceiver::new(Ping::default()),
-        }
     }
 }

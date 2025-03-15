@@ -5,11 +5,12 @@ use crate::{
     Callbacks,
 };
 
-use super::{OwnedStructSender, OwnedStructSenderResult, TXType};
+use super::{StructSender, StructSenderResult, TXType};
 
 #[derive(Debug, PartialEq)]
 pub struct TX1FSDOAbort {
-    sender: OwnedStructSender<SDOAbort>,
+    structure: SDOAbort,
+    sender: StructSender,
 }
 
 impl From<TX1FSDOAbort> for State {
@@ -22,17 +23,21 @@ impl_receiver_nop!(TX1FSDOAbort);
 
 impl Sender for TX1FSDOAbort {
     fn tx(self, core: &mut Core, _callbacks: &mut Callbacks) -> Response {
-        let (state, response) = self.sender.tx();
+        let (state, response) = self.sender.tx(&self.structure);
         core.crc.update_single(response);
 
         let response = Some(response);
 
         match state {
-            OwnedStructSenderResult::Continue(sender) => Response {
+            StructSenderResult::Continue(sender) => Response {
                 response,
-                state: Self { sender }.into(),
+                state: Self {
+                    structure: self.structure,
+                    sender,
+                }
+                .into(),
             },
-            OwnedStructSenderResult::Done() => Response {
+            StructSenderResult::Done() => Response {
                 response,
                 state: State::SendResponseCRC,
             },
@@ -43,7 +48,8 @@ impl Sender for TX1FSDOAbort {
 impl TX1FSDOAbort {
     pub fn new(abort: SDOAbort) -> Self {
         Self {
-            sender: OwnedStructSender::new(abort),
+            structure: abort,
+            sender: StructSender::default(),
         }
     }
 }

@@ -10,32 +10,37 @@ use crate::{
     Callbacks, ObjectBuffer,
 };
 
-use super::{OwnedStructReceiver, OwnedStructReceiverResult, RXType};
+use super::{RXType, StructReceiver, StructReceiverResult};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct RX10SDORead {
-    receiver: OwnedStructReceiver<Ping>,
+    structure: Structure,
+    receiver: StructReceiver,
 }
 
 #[repr(align(1))]
 #[derive(Debug, Default, PartialEq)]
-struct Ping {
+struct Structure {
     universe: u8,
     address: u8,
     object_index: u16,
 }
 
 impl Receiver for RX10SDORead {
-    fn rx(self, data: u8, core: &mut Core, callbacks: &mut Callbacks) -> Response {
+    fn rx(mut self, data: u8, core: &mut Core, callbacks: &mut Callbacks) -> Response {
         core.crc.update_single(data);
 
-        match self.receiver.rx(data) {
-            OwnedStructReceiverResult::Continue(receiver) => {
-                Response::from_state(Self { receiver }.into())
-            }
-            OwnedStructReceiverResult::Done(v) => {
+        match self.receiver.rx(data, &mut self.structure) {
+            StructReceiverResult::Continue(receiver) => Response::from_state(
+                Self {
+                    structure: self.structure,
+                    receiver,
+                }
+                .into(),
+            ),
+            StructReceiverResult::Done => {
                 let mut buf = ObjectBuffer::default();
-                let callback_res = (callbacks.read_object)(v.object_index, &mut buf);
+                let callback_res = (callbacks.read_object)(self.structure.object_index, &mut buf);
 
                 match callback_res {
                     Ok(size) => State::WaitForCRC(Some(TXType::SDOResponse(TX11SDOResponse::new(
@@ -47,7 +52,7 @@ impl Receiver for RX10SDORead {
 
                         let abort = SDOAbort {
                             operation: 0x00,
-                            index: v.object_index,
+                            index: self.structure.object_index,
                             abort_code,
                         };
 
@@ -62,13 +67,5 @@ impl Receiver for RX10SDORead {
 impl From<RX10SDORead> for State {
     fn from(value: RX10SDORead) -> Self {
         Self::HandleRX(RXType::SDORead(value))
-    }
-}
-
-impl Default for RX10SDORead {
-    fn default() -> Self {
-        Self {
-            receiver: OwnedStructReceiver::new(Ping::default()),
-        }
     }
 }

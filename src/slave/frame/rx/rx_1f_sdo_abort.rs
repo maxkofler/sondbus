@@ -4,22 +4,27 @@ use crate::{
     Callbacks,
 };
 
-use super::{OwnedStructReceiver, OwnedStructReceiverResult, RXType};
+use super::{RXType, StructReceiver, StructReceiverResult};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct RX1FSDOAbort {
-    receiver: OwnedStructReceiver<SDOAbort>,
+    structure: SDOAbort,
+    receiver: StructReceiver,
 }
 
 impl Receiver for RX1FSDOAbort {
-    fn rx(self, data: u8, core: &mut Core, _callbacks: &mut Callbacks) -> Response {
+    fn rx(mut self, data: u8, core: &mut Core, _callbacks: &mut Callbacks) -> Response {
         core.crc.update_single(data);
 
-        match self.receiver.rx(data) {
-            OwnedStructReceiverResult::Continue(receiver) => {
-                Response::from_state(Self { receiver }.into())
-            }
-            OwnedStructReceiverResult::Done(_) => Response {
+        match self.receiver.rx(data, &mut self.structure) {
+            StructReceiverResult::Continue(receiver) => Response::from_state(
+                Self {
+                    structure: self.structure,
+                    receiver,
+                }
+                .into(),
+            ),
+            StructReceiverResult::Done => Response {
                 response: None,
                 state: State::WaitForCRC(None),
             },
@@ -30,13 +35,5 @@ impl Receiver for RX1FSDOAbort {
 impl From<RX1FSDOAbort> for State {
     fn from(value: RX1FSDOAbort) -> Self {
         Self::HandleRX(RXType::SDOAbort(value))
-    }
-}
-
-impl Default for RX1FSDOAbort {
-    fn default() -> Self {
-        Self {
-            receiver: OwnedStructReceiver::new(SDOAbort::default()),
-        }
     }
 }

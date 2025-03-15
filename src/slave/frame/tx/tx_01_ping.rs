@@ -5,11 +5,12 @@ use crate::{
     Callbacks,
 };
 
-use super::{OwnedStructSender, OwnedStructSenderResult, TXType};
+use super::{StructSender, StructSenderResult, TXType};
 
 #[derive(Debug, PartialEq)]
 pub struct TX01Ping {
-    sender: OwnedStructSender<Ping>,
+    structure: Ping,
+    sender: StructSender,
 }
 
 #[derive(Debug, PartialEq)]
@@ -28,16 +29,19 @@ impl_receiver_nop!(TX01Ping);
 
 impl Sender for TX01Ping {
     fn tx(self, core: &mut Core, _callbacks: &mut Callbacks) -> Response {
-        let (state, response) = self.sender.tx();
+        let (state, response) = self.sender.tx(&self.structure);
 
         core.crc.update_single(response);
 
         match state {
-            OwnedStructSenderResult::Continue(sender) => Response {
-                state: State::HandleTX(TXType::Ping(Self { sender })),
+            StructSenderResult::Continue(sender) => Response {
+                state: State::HandleTX(TXType::Ping(Self {
+                    structure: self.structure,
+                    sender,
+                })),
                 response: Some(response),
             },
-            OwnedStructSenderResult::Done() => Response {
+            StructSenderResult::Done() => Response {
                 state: State::SendResponseCRC,
                 response: Some(response),
             },
@@ -53,7 +57,8 @@ impl TX01Ping {
         };
 
         Self {
-            sender: OwnedStructSender::new(ping),
+            structure: ping,
+            sender: StructSender::default(),
         }
     }
 }
