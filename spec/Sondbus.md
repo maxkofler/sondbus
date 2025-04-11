@@ -9,6 +9,7 @@ This document describes the `sondbus` protocol that aims to create a reliable co
 - [3 - Frame Types](#3---frame-types)
 - [4 - Slave Synchronization](#4---slave-synchronization)
 - [5 - Addressing](#5---addressing)
+- [6 - Object Dictionary](#6---object-dictionary)
 
 ## Data Layout
 
@@ -136,5 +137,13 @@ A logical address is split into 2 parts:
 - Address
 
 A universe is a collection of 254 devices (+1 broadcast), while an address is unique within its universe.
+The address `0xFF` is reserved as a broadcast address, directing a frame with this address at all slaves in the universe.
+The universe `0xFF` is reserved as a broadcast in a global sense, directing a frame to all universes and slaves within them whose addresses match up.
+A global broadcast can be achieved by sending a frame to universe `0xFF` and address `0xFF`.
 
 This separation allows for partitioning of the network to group up slaves in a way that allows the master to optimize transfers and broadcasts.
+
+# 6 - Object Dictionary
+
+Sondbus uses an object dictionary that is compatible with CANOpen.
+Implementing it requires each slave to present a dictionary that is indexed by an `Index` of 16 bytes and a `Subindex` of 8 bytes.
