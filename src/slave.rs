@@ -91,14 +91,19 @@ impl BusState {
             Self::Request(r) => r.rx(data, core),
 
             //
-            // All other states are NOPs in the sense that a RX is not handled,
+            // All other states are errors in the sense that a RX is not handled,
             // but the `in_sync` flag will be disabled, as a received byte in
             // these states is not expected and thus not allowed and would hint
-            // at a bus timing or conformance violation.
+            // at a bus timing or conformance violation. This will transition
+            // the bus state back to Idle to wait for a new sync.
             //
-            x => {
+            Self::ResponseStart(_) => {
                 core.in_sync = false;
-                (x, None)
+                (Self::Idle, None)
+            }
+            Self::Response(_) => {
+                core.in_sync = false;
+                (Self::Idle, None)
             }
         }
     }
