@@ -5,15 +5,25 @@ pub use request::*;
 mod response;
 pub use response::*;
 
-use crate::SINGLE_START_BYTE;
+use crate::{
+    crc8::{CRC8Autosar, CRC},
+    SINGLE_START_BYTE,
+};
 
+#[derive(Debug, Default)]
 pub struct SlaveHandle {
     state: BusState,
+    core: SlaveCore,
+}
+
+#[derive(Debug, Default)]
+pub struct SlaveCore {
     in_sync: bool,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Default)]
 pub enum BusState {
+    #[default]
     Idle,
     Request(RequestState),
     ResponseStart(ResponseState),
@@ -30,7 +40,7 @@ impl SlaveHandle {
         let mut response = None;
 
         replace_with_or_abort(&mut self.state, |s| {
-            let (s, r) = s.rx(data, &mut self.in_sync);
+            let (s, r) = s.rx(data, &mut self.core);
             response = r;
             s
         });
@@ -55,7 +65,7 @@ impl SlaveHandle {
 }
 
 impl BusState {
-    fn rx(self, data: u8, in_sync: &mut bool) -> (Self, Option<u8>) {
+    fn rx(self, data: u8, core: &mut SlaveCore) -> (Self, Option<u8>) {
         match self {
             //
             // In the idle state, we essentially wait for the start byte.
@@ -64,9 +74,11 @@ impl BusState {
             //
             Self::Idle => (
                 if data == SINGLE_START_BYTE {
-                    Self::Request(RequestState::Command)
+                    Self::Request(RequestState::Command(
+                        CRC8Autosar::new().update_single_move(data),
+                    ))
                 } else {
-                    *in_sync = false;
+                    core.in_sync = false;
                     Self::Idle
                 },
                 None,
@@ -76,7 +88,7 @@ impl BusState {
             // If we are an the request handling state, forward all
             // bytes to the request state RX handler to proceed
             //
-            Self::Request(r) => r.rx(data),
+            Self::Request(r) => r.rx(data, core),
 
             //
             // All other states are NOPs in the sense that a RX is not handled,
@@ -85,7 +97,7 @@ impl BusState {
             // at a bus timing or conformance violation.
             //
             x => {
-                *in_sync = false;
+                core.in_sync = false;
                 (x, None)
             }
         }
@@ -101,19 +113,43 @@ impl BusState {
 #[cfg(test)]
 mod tests {
     use crate::{
-        slave::{BusState, RequestState},
+        crc8::{CRC8Autosar, CRC},
+        slave::{BusState, RequestState, SlaveCore, SlaveHandle},
         SINGLE_START_BYTE,
     };
 
     /// Tests that the slave correctly handles an incoming start byte
     #[test]
     fn rx_single_start_byte() {
-        let mut tmp = false;
-        let state = BusState::Idle.rx(SINGLE_START_BYTE, &mut tmp);
+        let mut core = SlaveCore { in_sync: false };
+        let state = BusState::Idle.rx(SINGLE_START_BYTE, &mut core);
         assert_eq!(
             state.0,
-            BusState::Request(RequestState::Command),
+            BusState::Request(RequestState::Command(
+                CRC8Autosar::new().update_single_move(SINGLE_START_BYTE)
+            )),
             "Single-Command start byte"
         )
+    }
+
+    #[test]
+    fn rx_nop() {
+        let mut handle = SlaveHandle::default();
+        let mut crc = CRC8Autosar::new();
+
+        handle.rx(SINGLE_START_BYTE);
+        crc.update_single(SINGLE_START_BYTE);
+
+        handle.rx(0x00);
+        crc.update_single(0x00);
+
+        assert_eq!(
+            handle.state,
+            BusState::Request(RequestState::CRC(None, crc.clone().finalize()))
+        );
+
+        handle.rx(crc.finalize());
+
+        assert_eq!(handle.state, BusState::Idle);
     }
 }
