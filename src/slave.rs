@@ -114,4 +114,66 @@ impl BusState {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::{
+        crc8::{CRC8Autosar, CRC},
+        slave::{BusState, SlaveHandle},
+        SINGLE_START_BYTE,
+    };
+
+    /// Check that the bus correctly transitions from `Idle` to `WaitForCommand`
+    /// when receiving a single-command start byte
+    #[test]
+    fn idle_to_cmd() {
+        let mut slave = SlaveHandle::default();
+
+        // This transition does NEVER yield a response
+        assert_eq!(
+            slave.rx(SINGLE_START_BYTE),
+            None,
+            "Idle -> Command incorrectly responds"
+        );
+
+        // Check that the internal state moved to the correct next state
+        assert_eq!(
+            slave.state,
+            BusState::WaitForCommand(CRC8Autosar::new().update_single_move(SINGLE_START_BYTE)),
+            "Idle -> Command does not happen correctly"
+        )
+    }
+
+    /// Test that the `in_sync` flag is kept as-is for a
+    /// correct transition from `Idle` to `WaitForCommand`
+    /// and that it is reset if an invalid byte is received
+    #[test]
+    fn idle_to_cmd_sync() {
+        // Check that in_sync stays false for correct transitions
+        let mut slave = SlaveHandle::default();
+        assert_eq!(
+            slave.core.in_sync, false,
+            "in_sync is not false for new instance"
+        );
+        slave.rx(SINGLE_START_BYTE);
+        assert!(!slave.core.in_sync, "in_sync changed unexpectedly");
+
+        // Check that in_sync stays true for correct transitions
+        let mut slave = SlaveHandle::default();
+        slave.core.in_sync = true;
+        slave.rx(SINGLE_START_BYTE);
+        assert!(slave.core.in_sync, "in_sync changed unexpectedly");
+
+        // Check that in_sync is stays false for incorrect bytes
+        let mut slave = SlaveHandle::default();
+        slave.rx(SINGLE_START_BYTE + 0x34);
+        assert!(!slave.core.in_sync, "in_sync is set for false starts");
+
+        // Check that in_sync is set from true to false for incorrect bytes
+        let mut slave = SlaveHandle::default();
+        slave.core.in_sync = true;
+        slave.rx(SINGLE_START_BYTE + 0x34);
+        assert!(
+            !slave.core.in_sync,
+            "in_sync is not de-asserted for false starts"
+        );
+    }
+}
