@@ -25,6 +25,9 @@ pub enum BusState {
 
     /// Wait for the command byte and parse it
     WaitForCommand(CRC8Autosar),
+
+    /// Wait for the final CRC checksum of the frame
+    WaitForCRC(u8),
 }
 
 impl SlaveHandle {
@@ -85,14 +88,27 @@ impl BusState {
             //
             Self::WaitForCommand(crc) => match Command::from_u8(data) {
                 Some(cmd) => {
-                    let _crc = crc.update_single_move(data);
+                    let crc = crc.update_single_move(data);
                     match cmd {
-                        Command::NOP => (Self::Idle, None),
+                        Command::NOP => (Self::WaitForCRC(crc.finalize()), None),
                         _ => panic!("Unimplemented command"),
                     }
                 }
                 None => (Self::sync_lost(core), None),
             },
+
+            //
+            // Wait for the final CRC checksum to confirm
+            // correct reception of the command
+            //
+            Self::WaitForCRC(crc) => (
+                if crc == data {
+                    Self::Idle
+                } else {
+                    Self::sync_lost(core)
+                },
+                None,
+            ),
         }
     }
 
@@ -116,6 +132,7 @@ impl BusState {
 #[cfg(test)]
 mod tests {
     use crate::{
+        command::Command,
         crc8::{CRC8Autosar, CRC},
         slave::{BusState, SlaveHandle},
         SINGLE_START_BYTE,
@@ -175,5 +192,23 @@ mod tests {
             !slave.core.in_sync,
             "in_sync is not de-asserted for false starts"
         );
+    }
+
+    /// Test the `NOP` command
+    #[test]
+    fn cmd_nop() {
+        let mut slave = SlaveHandle::default();
+        slave.core.in_sync = true;
+
+        let mut crc = CRC8Autosar::new();
+
+        assert_eq!(slave.rx(SINGLE_START_BYTE), None);
+        crc.update_single(SINGLE_START_BYTE);
+        assert_eq!(slave.state, BusState::WaitForCommand(crc.clone()));
+
+        let cmd = Command::NOP.u8();
+        assert_eq!(slave.rx(cmd), None);
+        crc.update_single(cmd);
+        assert_eq!(slave.state, BusState::WaitForCRC(crc.finalize()));
     }
 }
