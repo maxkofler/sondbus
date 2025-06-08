@@ -63,6 +63,16 @@ impl BusState {
         }
     }
 
+    /// Change the core's sync flag to false and go back to Idle
+    /// # Arguments
+    /// * `core` - The core to drop out of sync
+    /// # Returns
+    /// The new state
+    fn sync_lost(core: &mut SlaveCore) -> Self {
+        core.in_sync = false;
+        Self::Idle
+    }
+
     fn tx(self) -> (Self, Option<u8>) {
         match self {
             x => (x, None),
