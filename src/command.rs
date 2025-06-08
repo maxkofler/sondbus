@@ -44,4 +44,17 @@ impl Command {
             _ => None,
         }
     }
+
+    /// Returns the `u8` representation for this command
+    pub fn u8(self) -> u8 {
+        match self {
+            Self::NOP => 0x00,
+            Self::SYN => 0x10,
+            Self::BWR => 0x14,
+            Self::PRD => 0x16,
+            Self::PWR => 0x18,
+            Self::LRD(universe) => 0x20 | universe,
+            Self::LWR(universe) => 0x40 | universe,
+        }
+    }
 }
