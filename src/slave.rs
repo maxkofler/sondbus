@@ -6,15 +6,16 @@ use crate::{
     SINGLE_START_BYTE, SYNC_MAGIC,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct SlaveHandle {
     state: BusState,
     core: SlaveCore,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct SlaveCore {
     in_sync: bool,
+    scratchpad: [u8; 0xFF],
 }
 
 #[derive(PartialEq, Debug, Default)]
@@ -29,6 +30,28 @@ pub enum BusState {
     /// Process the sync command
     Sync(CRC8Autosar, usize),
 
+    WriteOffsetH {
+        crc: CRC8Autosar,
+        respond: bool,
+    },
+    WriteOffsetL {
+        crc: CRC8Autosar,
+        respond: bool,
+        offset: u8,
+    },
+    WriteLength {
+        crc: CRC8Autosar,
+        respond: bool,
+        offset: u16,
+    },
+    WriteData {
+        crc: CRC8Autosar,
+        respond: bool,
+        offset: u16,
+        length: u8,
+        written: u8,
+    },
+
     /// Wait for the final CRC checksum of the frame
     WaitForCRC(u8, BusAction),
 }
@@ -42,15 +65,21 @@ pub enum BusAction {
 
     /// Set the `in_sync` flag
     SetInSync(bool),
+
+    /// Respond with the CRC
+    WriteAndRespondCRC(CRC8Autosar),
 }
 
 impl SlaveHandle {
     /// A `const` variant of `default()` that allows const
     /// construction of a slave handle
-    pub const fn const_default() -> Self {
+    pub const fn default() -> Self {
         Self {
             state: BusState::Idle,
-            core: SlaveCore { in_sync: false },
+            core: SlaveCore {
+                in_sync: false,
+                scratchpad: [0u8; 0xFF],
+            },
         }
     }
 
@@ -127,6 +156,13 @@ impl BusState {
                                 (Self::WaitForCRC(crc.finalize(), BusAction::None), None)
                             }
                             Command::SYN => (Self::Sync(crc, 0), None),
+                            Command::BWR => (
+                                Self::WriteOffsetH {
+                                    crc,
+                                    respond: false,
+                                },
+                                None,
+                            ),
                             _ => panic!("Unimplemented command"),
                         }
                     } else {
@@ -163,18 +199,95 @@ impl BusState {
             // Wait for the final CRC checksum to confirm
             // correct reception of the command
             //
-            Self::WaitForCRC(crc, action) => (
+            Self::WaitForCRC(crc, action) => {
                 if crc == data {
                     match action {
-                        BusAction::None => {}
-                        BusAction::SetInSync(sync) => core.in_sync = sync,
+                        BusAction::None => (Self::Idle, None),
+                        BusAction::SetInSync(sync) => {
+                            core.in_sync = sync;
+                            (Self::Idle, None)
+                        }
+                        BusAction::WriteAndRespondCRC(crc) => {
+                            // TODO: Write
+                            (Self::Idle, Some(crc.update_single_move(data).finalize()))
+                        }
                     }
-                    Self::Idle
                 } else {
-                    Self::sync_lost(core)
+                    (Self::sync_lost(core), None)
+                }
+            }
+
+            Self::WriteOffsetH { crc, respond } => (
+                Self::WriteOffsetL {
+                    crc: crc.update_single_move(data),
+                    respond,
+                    offset: data,
                 },
                 None,
             ),
+
+            Self::WriteOffsetL {
+                crc,
+                respond,
+                offset,
+            } => (
+                Self::WriteLength {
+                    crc: crc.update_single_move(data),
+                    respond,
+                    offset: (offset as u16) << 8 | data as u16,
+                },
+                None,
+            ),
+
+            Self::WriteLength {
+                crc,
+                respond,
+                offset,
+            } => (
+                Self::WriteData {
+                    crc: crc.update_single_move(data),
+                    respond,
+                    offset,
+                    length: data,
+                    written: 0,
+                },
+                None,
+            ),
+
+            Self::WriteData {
+                crc,
+                respond,
+                offset,
+                length,
+                written,
+            } => {
+                core.scratchpad[written as usize] = data;
+
+                let written = written + 1;
+                let crc = crc.update_single_move(data);
+
+                if written >= length {
+                    if respond {
+                        (
+                            Self::WaitForCRC(crc.finalize(), BusAction::WriteAndRespondCRC(crc)),
+                            None,
+                        )
+                    } else {
+                        (Self::WaitForCRC(crc.finalize(), BusAction::None), None)
+                    }
+                } else {
+                    (
+                        Self::WriteData {
+                            crc,
+                            respond,
+                            offset,
+                            length,
+                            written,
+                        },
+                        None,
+                    )
+                }
+            }
         }
     }
 
