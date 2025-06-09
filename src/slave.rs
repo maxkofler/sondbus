@@ -117,10 +117,20 @@ impl BusState {
             Self::WaitForCommand(crc) => match Command::from_u8(data) {
                 Some(cmd) => {
                     let crc = crc.update_single_move(data);
-                    match cmd {
-                        Command::NOP => (Self::WaitForCRC(crc.finalize(), BusAction::None), None),
-                        Command::SYN => (Self::Sync(crc, 0), None),
-                        _ => panic!("Unimplemented command"),
+
+                    // We only handle a command if we are in sync or
+                    // it is a `SYN` command. Otherwise we'll fall out
+                    // of sync again just to be sure
+                    if core.in_sync || cmd == Command::SYN {
+                        match cmd {
+                            Command::NOP => {
+                                (Self::WaitForCRC(crc.finalize(), BusAction::None), None)
+                            }
+                            Command::SYN => (Self::Sync(crc, 0), None),
+                            _ => panic!("Unimplemented command"),
+                        }
+                    } else {
+                        (Self::sync_lost(core), None)
                     }
                 }
                 None => (Self::sync_lost(core), None),
