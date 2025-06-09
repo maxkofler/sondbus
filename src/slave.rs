@@ -45,6 +45,15 @@ pub enum BusAction {
 }
 
 impl SlaveHandle {
+    /// A `const` variant of `default()` that allows const
+    /// construction of a slave handle
+    pub const fn const_default() -> Self {
+        Self {
+            state: BusState::Idle,
+            core: SlaveCore { in_sync: false },
+        }
+    }
+
     /// Handle an incoming byte from the bus endpoint
     /// # Arguments
     /// * `data` - The byte of data to be handled
@@ -75,6 +84,11 @@ impl SlaveHandle {
         });
 
         response
+    }
+
+    /// Returns the sync state of the slave instance
+    pub fn in_sync(&self) -> bool {
+        self.core.in_sync
     }
 }
 
