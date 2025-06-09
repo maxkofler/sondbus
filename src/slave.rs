@@ -3,7 +3,7 @@ use replace_with::replace_with_or_abort;
 use crate::{
     command::Command,
     crc8::{CRC8Autosar, CRC},
-    SINGLE_START_BYTE,
+    SINGLE_START_BYTE, SYNC_MAGIC,
 };
 
 #[derive(Debug, Default)]
@@ -26,8 +26,22 @@ pub enum BusState {
     /// Wait for the command byte and parse it
     WaitForCommand(CRC8Autosar),
 
+    /// Process the sync command
+    Sync(CRC8Autosar, usize),
+
     /// Wait for the final CRC checksum of the frame
-    WaitForCRC(u8),
+    WaitForCRC(u8, BusAction),
+}
+
+/// The possible actions that follow a frame
+#[derive(PartialEq, Debug, Default)]
+pub enum BusAction {
+    /// Do nothing
+    #[default]
+    None,
+
+    /// Set the `in_sync` flag
+    SetInSync(bool),
 }
 
 impl SlaveHandle {
@@ -90,7 +104,8 @@ impl BusState {
                 Some(cmd) => {
                     let crc = crc.update_single_move(data);
                     match cmd {
-                        Command::NOP => (Self::WaitForCRC(crc.finalize()), None),
+                        Command::NOP => (Self::WaitForCRC(crc.finalize(), BusAction::None), None),
+                        Command::SYN => (Self::Sync(crc, 0), None),
                         _ => panic!("Unimplemented command"),
                     }
                 }
@@ -98,11 +113,38 @@ impl BusState {
             },
 
             //
+            // Wait for the bytes of the sync sequence to come
+            // in and check their correctness. If ok, move to
+            // the next and finally to the CRC for validation.
+            // If we receive any wrong byte, immediately loose
+            // sync.
+            //
+            Self::Sync(crc, pos) => {
+                let crc = crc.update_single_move(data);
+
+                let state = if SYNC_MAGIC[pos] == data {
+                    if pos >= 14 {
+                        Self::WaitForCRC(crc.finalize(), BusAction::SetInSync(true))
+                    } else {
+                        Self::Sync(crc, pos + 1)
+                    }
+                } else {
+                    Self::sync_lost(core)
+                };
+
+                (state, None)
+            }
+
+            //
             // Wait for the final CRC checksum to confirm
             // correct reception of the command
             //
-            Self::WaitForCRC(crc) => (
+            Self::WaitForCRC(crc, action) => (
                 if crc == data {
+                    match action {
+                        BusAction::None => {}
+                        BusAction::SetInSync(sync) => core.in_sync = sync,
+                    }
                     Self::Idle
                 } else {
                     Self::sync_lost(core)
@@ -134,8 +176,8 @@ mod tests {
     use crate::{
         command::Command,
         crc8::{CRC8Autosar, CRC},
-        slave::{BusState, SlaveHandle},
-        SINGLE_START_BYTE,
+        slave::{BusAction, BusState, SlaveHandle},
+        SINGLE_START_BYTE, SYNC_MAGIC,
     };
 
     /// Check that the bus correctly transitions from `Idle` to `WaitForCommand`
@@ -209,6 +251,33 @@ mod tests {
         let cmd = Command::NOP.u8();
         assert_eq!(slave.rx(cmd), None);
         crc.update_single(cmd);
-        assert_eq!(slave.state, BusState::WaitForCRC(crc.finalize()));
+        assert_eq!(
+            slave.state,
+            BusState::WaitForCRC(crc.finalize(), BusAction::None)
+        );
+    }
+
+    /// Test the `SYNC` command
+    #[test]
+    fn cmd_sync() {
+        let mut slave = SlaveHandle::default();
+        let mut crc = CRC8Autosar::new();
+
+        crc.update(&[SINGLE_START_BYTE, Command::SYN.u8()]);
+
+        assert_eq!(slave.rx(SINGLE_START_BYTE), None);
+        assert_eq!(slave.rx(Command::SYN.u8()), None);
+
+        for data in SYNC_MAGIC {
+            assert_eq!(slave.rx(data), None);
+            crc.update_single(data);
+        }
+
+        assert_eq!(
+            slave.state,
+            BusState::WaitForCRC(crc.finalize(), BusAction::SetInSync(true))
+        );
+        assert_eq!(slave.rx(crc.finalize()), None);
+        assert!(slave.core.in_sync)
     }
 }
