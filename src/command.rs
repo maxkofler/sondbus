@@ -2,7 +2,7 @@
 
 /// A sondbus command
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Command {
     /// No operation
     NOP = 0x00,
