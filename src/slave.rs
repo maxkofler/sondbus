@@ -30,20 +30,24 @@ pub enum BusState {
     /// Process the sync command
     Sync(CRC8Autosar, usize),
 
-    WriteOffsetH {
-        crc: CRC8Autosar,
-        respond: bool,
-    },
+    /// Wait for the high byte of the incoming offset of a write command
+    WriteOffsetH { crc: CRC8Autosar, respond: bool },
+
+    /// Wait for the low byte of the incoming offset of a write command
     WriteOffsetL {
         crc: CRC8Autosar,
         respond: bool,
         offset: u8,
     },
+
+    /// Wait for the incoming length of a write command
     WriteLength {
         crc: CRC8Autosar,
         respond: bool,
         offset: u16,
     },
+
+    /// Wait and process the incoming data of a write command
     WriteData {
         crc: CRC8Autosar,
         respond: bool,
@@ -221,6 +225,10 @@ impl BusState {
                 }
             }
 
+            //
+            // Wait for the incoming high byte of the offset
+            // to write at using a write command
+            //
             Self::WriteOffsetH { crc, respond } => (
                 Self::WriteOffsetL {
                     crc: crc.update_single_move(data),
@@ -230,6 +238,10 @@ impl BusState {
                 None,
             ),
 
+            //
+            // Wait for the incoming low byte of the offset
+            // to write at using a write command
+            //
             Self::WriteOffsetL {
                 crc,
                 respond,
@@ -243,6 +255,9 @@ impl BusState {
                 None,
             ),
 
+            //
+            // Wait for the incoming length of a write command
+            //
             Self::WriteLength {
                 crc,
                 respond,
@@ -266,6 +281,9 @@ impl BusState {
                 }
             }
 
+            //
+            // Wait and note the incoming data of a write command
+            //
             Self::WriteData {
                 crc,
                 respond,
