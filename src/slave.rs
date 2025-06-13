@@ -7,15 +7,15 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct SlaveHandle {
+pub struct SlaveHandle<const SCRATCHPAD_SIZE: usize> {
     state: BusState,
-    core: SlaveCore,
+    core: SlaveCore<SCRATCHPAD_SIZE>,
 }
 
 #[derive(Debug)]
-pub struct SlaveCore {
+pub struct SlaveCore<const SCRATCHPAD_SIZE: usize> {
     in_sync: bool,
-    scratchpad: [u8; 0xFF],
+    scratchpad: [u8; SCRATCHPAD_SIZE],
 }
 
 #[derive(PartialEq, Debug, Default)]
@@ -70,7 +70,7 @@ pub enum BusAction {
     WriteAndRespondCRC(CRC8Autosar),
 }
 
-impl SlaveHandle {
+impl<const SCRATCHPAD_SIZE: usize> SlaveHandle<SCRATCHPAD_SIZE> {
     /// A `const` variant of `default()` that allows const
     /// construction of a slave handle
     pub const fn default() -> Self {
@@ -78,7 +78,7 @@ impl SlaveHandle {
             state: BusState::Idle,
             core: SlaveCore {
                 in_sync: false,
-                scratchpad: [0u8; 0xFF],
+                scratchpad: [0u8; SCRATCHPAD_SIZE],
             },
         }
     }
@@ -122,7 +122,11 @@ impl SlaveHandle {
 }
 
 impl BusState {
-    fn rx(self, data: u8, core: &mut SlaveCore) -> (Self, Option<u8>) {
+    fn rx<const SCRATCHPAD_SIZE: usize>(
+        self,
+        data: u8,
+        core: &mut SlaveCore<SCRATCHPAD_SIZE>,
+    ) -> (Self, Option<u8>) {
         match self {
             //
             // In the idle state, we essentially wait for the start byte.
@@ -243,16 +247,24 @@ impl BusState {
                 crc,
                 respond,
                 offset,
-            } => (
-                Self::WriteData {
-                    crc: crc.update_single_move(data),
-                    respond,
-                    offset,
-                    length: data,
-                    written: 0,
-                },
-                None,
-            ),
+            } => {
+                // Check if we're able to fit the data into the scratchpad,
+                // otherwise, we'll loose sync as something fishy might go on
+                if data > SCRATCHPAD_SIZE as u8 {
+                    (Self::sync_lost(core), None)
+                } else {
+                    (
+                        Self::WriteData {
+                            crc: crc.update_single_move(data),
+                            respond,
+                            offset,
+                            length: data,
+                            written: 0,
+                        },
+                        None,
+                    )
+                }
+            }
 
             Self::WriteData {
                 crc,
@@ -296,7 +308,7 @@ impl BusState {
     /// * `core` - The core to drop out of sync
     /// # Returns
     /// The new state
-    fn sync_lost(core: &mut SlaveCore) -> Self {
+    fn sync_lost<const SCRATCHPAD_SIZE: usize>(core: &mut SlaveCore<SCRATCHPAD_SIZE>) -> Self {
         core.in_sync = false;
         Self::Idle
     }
@@ -321,7 +333,7 @@ mod tests {
     /// when receiving a single-command start byte
     #[test]
     fn idle_to_cmd() {
-        let mut slave = SlaveHandle::default();
+        let mut slave = SlaveHandle::<0>::default();
 
         // This transition does NEVER yield a response
         assert_eq!(
@@ -344,7 +356,7 @@ mod tests {
     #[test]
     fn idle_to_cmd_sync() {
         // Check that in_sync stays false for correct transitions
-        let mut slave = SlaveHandle::default();
+        let mut slave = SlaveHandle::<0>::default();
         assert_eq!(
             slave.core.in_sync, false,
             "in_sync is not false for new instance"
@@ -353,18 +365,18 @@ mod tests {
         assert!(!slave.core.in_sync, "in_sync changed unexpectedly");
 
         // Check that in_sync stays true for correct transitions
-        let mut slave = SlaveHandle::default();
+        let mut slave = SlaveHandle::<0>::default();
         slave.core.in_sync = true;
         slave.rx(SINGLE_START_BYTE);
         assert!(slave.core.in_sync, "in_sync changed unexpectedly");
 
         // Check that in_sync is stays false for incorrect bytes
-        let mut slave = SlaveHandle::default();
+        let mut slave = SlaveHandle::<0>::default();
         slave.rx(SINGLE_START_BYTE + 0x34);
         assert!(!slave.core.in_sync, "in_sync is set for false starts");
 
         // Check that in_sync is set from true to false for incorrect bytes
-        let mut slave = SlaveHandle::default();
+        let mut slave = SlaveHandle::<0>::default();
         slave.core.in_sync = true;
         slave.rx(SINGLE_START_BYTE + 0x34);
         assert!(
@@ -376,7 +388,7 @@ mod tests {
     /// Test the `NOP` command
     #[test]
     fn cmd_nop() {
-        let mut slave = SlaveHandle::default();
+        let mut slave = SlaveHandle::<0>::default();
         slave.core.in_sync = true;
 
         let mut crc = CRC8Autosar::new();
@@ -397,7 +409,7 @@ mod tests {
     /// Test the `SYNC` command
     #[test]
     fn cmd_sync() {
-        let mut slave = SlaveHandle::default();
+        let mut slave = SlaveHandle::<0>::default();
         let mut crc = CRC8Autosar::new();
 
         crc.update(&[SINGLE_START_BYTE, Command::SYN.u8()]);
