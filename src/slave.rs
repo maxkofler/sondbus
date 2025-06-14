@@ -205,47 +205,6 @@ impl BusState {
             }
 
             //
-            // Wait for the final CRC checksum to confirm
-            // correct reception of the command
-            //
-            Self::WaitForCRC(crc, action) => {
-                if crc == data {
-                    match action {
-                        BusAction::None => (Self::Idle, None),
-                        BusAction::SetInSync(sync) => {
-                            core.in_sync = sync;
-                            (Self::Idle, None)
-                        }
-                        // Write the data out to the memory area and go back to the
-                        // idle state
-                        BusAction::WriteAndIdle(offset, len) => {
-                            callback(CallbackAction::Write(
-                                offset,
-                                &core.scratchpad[0..len as usize],
-                            ));
-
-                            (Self::Idle, None)
-                        }
-                        // Write the data out to the memory area and respond
-                        // with a CRC checksum
-                        BusAction::WriteAndRespondCRC(offset, len, crc) => {
-                            let res = callback(CallbackAction::Write(
-                                offset,
-                                &core.scratchpad[0..len as usize],
-                            ));
-                            if res {
-                                (Self::Idle, Some(crc.update_single_move(data).finalize()))
-                            } else {
-                                (Self::sync_lost(core), None)
-                            }
-                        }
-                    }
-                } else {
-                    (Self::sync_lost(core), None)
-                }
-            }
-
-            //
             // Wait for the incoming byte of the offset
             // to write at using a write command
             //
@@ -313,6 +272,47 @@ impl BusState {
                         },
                         None,
                     )
+                }
+            }
+
+            //
+            // Wait for the final CRC checksum to confirm
+            // correct reception of the command
+            //
+            Self::WaitForCRC(crc, action) => {
+                if crc == data {
+                    match action {
+                        BusAction::None => (Self::Idle, None),
+                        BusAction::SetInSync(sync) => {
+                            core.in_sync = sync;
+                            (Self::Idle, None)
+                        }
+                        // Write the data out to the memory area and go back to the
+                        // idle state
+                        BusAction::WriteAndIdle(offset, len) => {
+                            callback(CallbackAction::Write(
+                                offset,
+                                &core.scratchpad[0..len as usize],
+                            ));
+
+                            (Self::Idle, None)
+                        }
+                        // Write the data out to the memory area and respond
+                        // with a CRC checksum
+                        BusAction::WriteAndRespondCRC(offset, len, crc) => {
+                            let res = callback(CallbackAction::Write(
+                                offset,
+                                &core.scratchpad[0..len as usize],
+                            ));
+                            if res {
+                                (Self::Idle, Some(crc.update_single_move(data).finalize()))
+                            } else {
+                                (Self::sync_lost(core), None)
+                            }
+                        }
+                    }
+                } else {
+                    (Self::sync_lost(core), None)
                 }
             }
         }
