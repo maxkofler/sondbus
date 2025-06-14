@@ -49,7 +49,7 @@ mod tests {
     use crate::{
         command::Command,
         crc8::{CRC8Autosar, CRC},
-        slave::{tests::common::rx_callback_panic, BusAction, BusState, SlaveHandle},
+        slave::{tests::common::rx_callback_panic, BusAction, SlaveHandle, SlaveState},
         SINGLE_START_BYTE, SYNC_MAGIC,
     };
 
@@ -69,7 +69,7 @@ mod tests {
         // Check that the internal state moved to the correct next state
         assert_eq!(
             slave.state(),
-            BusState::WaitForCommand,
+            SlaveState::WaitForCommand,
             "Idle -> Command does not happen correctly"
         )
     }
@@ -119,14 +119,14 @@ mod tests {
 
         assert_eq!(slave.rx(SINGLE_START_BYTE, rx_callback_panic), None);
         crc.update_single(SINGLE_START_BYTE);
-        assert_eq!(slave.state(), BusState::WaitForCommand);
+        assert_eq!(slave.state(), SlaveState::WaitForCommand);
 
         let cmd = Command::NOP.u8();
         assert_eq!(slave.rx(cmd, rx_callback_panic), None);
         crc.update_single(cmd);
         assert_eq!(
             slave.state(),
-            BusState::WaitForCRC(crc.finalize(), BusAction::None)
+            SlaveState::WaitForCRC(crc.finalize(), BusAction::None)
         );
     }
 
@@ -148,7 +148,7 @@ mod tests {
 
         assert_eq!(
             slave.state(),
-            BusState::WaitForCRC(crc.finalize(), BusAction::SetInSync(true))
+            SlaveState::WaitForCRC(crc.finalize(), BusAction::SetInSync(true))
         );
         assert_eq!(slave.rx(crc.finalize(), rx_callback_panic), None);
         assert!(slave.core.in_sync())

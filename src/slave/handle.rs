@@ -1,10 +1,10 @@
 use replace_with::replace_with_or_abort;
 
-use crate::slave::{BusState, CallbackAction, SlaveCore};
+use crate::slave::{CallbackAction, SlaveCore, SlaveState};
 
 #[derive(Debug)]
 pub struct SlaveHandle<const SCRATCHPAD_SIZE: usize> {
-    state: BusState,
+    state: SlaveState,
     pub core: SlaveCore<SCRATCHPAD_SIZE>,
 }
 
@@ -13,7 +13,7 @@ impl<const SCRATCHPAD_SIZE: usize> SlaveHandle<SCRATCHPAD_SIZE> {
     /// construction of a slave handle
     pub const fn default() -> Self {
         Self {
-            state: BusState::Idle,
+            state: SlaveState::Idle,
             core: SlaveCore::default(),
         }
     }
@@ -63,7 +63,7 @@ mod test {
     use crate::{
         crc8::CRC8Autosar,
         slave::{
-            tests::common::rx_callback_panic, BusState, CallbackAction, SlaveCore, SlaveHandle,
+            tests::common::rx_callback_panic, CallbackAction, SlaveCore, SlaveHandle, SlaveState,
         },
         SINGLE_START_BYTE,
     };
@@ -119,7 +119,7 @@ mod test {
             self.test_rx_no_response_no_callback(SINGLE_START_BYTE);
             assert_eq!(
                 self.state,
-                BusState::WaitForCommand,
+                SlaveState::WaitForCommand,
                 "Does not react to start byte"
             );
         }
@@ -129,7 +129,7 @@ mod test {
             let mut core = SlaveCore::default();
             core.set_in_sync(true);
             Self {
-                state: BusState::Idle,
+                state: SlaveState::Idle,
                 core,
             }
         }
@@ -139,7 +139,7 @@ mod test {
             self.core.crc().clone()
         }
 
-        pub fn state(&self) -> BusState {
+        pub fn state(&self) -> SlaveState {
             self.state.clone()
         }
     }

@@ -1,7 +1,7 @@
 use crate::{
     command::Command,
     crc8::{CRC8Autosar, CRC},
-    slave::{BusAction, BusState, CallbackAction, SlaveHandle},
+    slave::{BusAction, CallbackAction, SlaveHandle, SlaveState},
     SINGLE_START_BYTE,
 };
 
@@ -17,7 +17,7 @@ pub fn one_length() {
     // Offset
     assert_eq!(
         slave.state(),
-        BusState::WriteOffset { respond: false },
+        SlaveState::WriteOffset { respond: false },
         "BWR does not wait for high offset"
     );
     slave.test_rx_no_response_no_callback(0);
@@ -26,7 +26,7 @@ pub fn one_length() {
     // Length
     assert_eq!(
         slave.state(),
-        BusState::WriteLength {
+        SlaveState::WriteLength {
             respond: false,
             offset: 0
         },
@@ -38,7 +38,7 @@ pub fn one_length() {
     // Data: 0xAA
     assert_eq!(
         slave.state(),
-        BusState::WriteData {
+        SlaveState::WriteData {
             respond: false,
             offset: 0,
             length: 1,
@@ -52,7 +52,7 @@ pub fn one_length() {
     // CRC
     assert_eq!(
         slave.state(),
-        BusState::WaitForCRC(crc.finalize(), BusAction::WriteAndIdle(0, 1)),
+        SlaveState::WaitForCRC(crc.finalize(), BusAction::WriteAndIdle(0, 1)),
         "BWR does not wait for CRC"
     );
     fn callback(action: CallbackAction) -> bool {
@@ -64,7 +64,7 @@ pub fn one_length() {
     // Idle
     assert_eq!(
         slave.state(),
-        BusState::Idle,
+        SlaveState::Idle,
         "BWR does not go back to idle after write"
     );
 }
@@ -81,7 +81,7 @@ pub fn zero_length() {
     // Offset
     assert_eq!(
         slave.state(),
-        BusState::WriteOffset { respond: false },
+        SlaveState::WriteOffset { respond: false },
         "BWR does not wait for high offset"
     );
     slave.test_rx_no_response_no_callback(0);
@@ -90,7 +90,7 @@ pub fn zero_length() {
     // Length
     assert_eq!(
         slave.state(),
-        BusState::WriteLength {
+        SlaveState::WriteLength {
             respond: false,
             offset: 0
         },
@@ -102,7 +102,7 @@ pub fn zero_length() {
     // CRC
     assert_eq!(
         slave.state(),
-        BusState::WaitForCRC(crc.finalize(), BusAction::None),
+        SlaveState::WaitForCRC(crc.finalize(), BusAction::None),
         "BWR does not wait for CRC"
     );
     slave.test_rx_no_response_no_callback(crc.finalize());
@@ -110,7 +110,7 @@ pub fn zero_length() {
     // Idle
     assert_eq!(
         slave.state(),
-        BusState::Idle,
+        SlaveState::Idle,
         "BWR does not go back to idle after write"
     );
 }

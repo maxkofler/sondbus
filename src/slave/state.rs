@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(Clone, PartialEq, Debug, Default)]
-pub enum BusState {
+pub enum SlaveState {
     /// The idle bus state that waits for a start byte
     #[default]
     Idle,
@@ -35,7 +35,7 @@ pub enum BusState {
     WaitForCRC(u8, BusAction),
 }
 
-impl BusState {
+impl SlaveState {
     pub fn rx<const SCRATCHPAD_SIZE: usize, F: FnMut(CallbackAction) -> bool>(
         self,
         data: u8,
