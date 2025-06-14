@@ -3,7 +3,11 @@
   "ignorePaths": [],
   "dictionaryDefinitions": [],
   "dictionaries": [],
-  "words": ["Autosar", "SONDBUS"],
+  "words": [
+    "Autosar",
+    "repr",
+    "SONDBUS"
+  ],
   "ignoreWords": [],
   "import": []
 }
