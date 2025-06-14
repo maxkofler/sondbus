@@ -6,6 +6,17 @@ use crate::{
     SINGLE_START_BYTE, SYNC_MAGIC,
 };
 
+/// The action to be performed when the bus
+/// calls back to the host application
+#[derive(Debug, PartialEq, Eq)]
+pub enum CallbackAction<'a> {
+    /// Write `1` at `0` to the memory
+    Write(u16, &'a [u8]),
+
+    /// Read from memory into `1` from `0`
+    Read(u16, &'a mut [u8]),
+}
+
 #[derive(Debug)]
 pub struct SlaveHandle<const SCRATCHPAD_SIZE: usize> {
     state: BusState,
@@ -71,7 +82,11 @@ pub enum BusAction {
     SetInSync(bool),
 
     /// Respond with the CRC
-    WriteAndRespondCRC(CRC8Autosar),
+    WriteAndRespondCRC(u16, u8, CRC8Autosar),
+
+    /// Write the scratchpad data using the callback
+    /// and go back to idle
+    WriteAndIdle(u16, u8),
 }
 
 impl<const SCRATCHPAD_SIZE: usize> SlaveHandle<SCRATCHPAD_SIZE> {
@@ -90,13 +105,15 @@ impl<const SCRATCHPAD_SIZE: usize> SlaveHandle<SCRATCHPAD_SIZE> {
     /// Handle an incoming byte from the bus endpoint
     /// # Arguments
     /// * `data` - The byte of data to be handled
+    /// * `callback` - A function that the bus can use to call
+    ///                back to the host application for data reads and writes
     /// # Returns
     /// A possible byte to be sent back
-    pub fn rx(&mut self, data: u8) -> Option<u8> {
+    pub fn rx<F: FnMut(CallbackAction) -> bool>(&mut self, data: u8, callback: F) -> Option<u8> {
         let mut response = None;
 
         replace_with_or_abort(&mut self.state, |s| {
-            let (s, r) = s.rx(data, &mut self.core);
+            let (s, r) = s.rx(data, &mut self.core, callback);
             response = r;
             s
         });
@@ -126,10 +143,11 @@ impl<const SCRATCHPAD_SIZE: usize> SlaveHandle<SCRATCHPAD_SIZE> {
 }
 
 impl BusState {
-    fn rx<const SCRATCHPAD_SIZE: usize>(
+    fn rx<const SCRATCHPAD_SIZE: usize, F: FnMut(CallbackAction) -> bool>(
         self,
         data: u8,
         core: &mut SlaveCore<SCRATCHPAD_SIZE>,
+        mut callback: F,
     ) -> (Self, Option<u8>) {
         match self {
             //
@@ -215,9 +233,28 @@ impl BusState {
                             core.in_sync = sync;
                             (Self::Idle, None)
                         }
-                        BusAction::WriteAndRespondCRC(crc) => {
-                            // TODO: Write
-                            (Self::Idle, Some(crc.update_single_move(data).finalize()))
+                        // Write the data out to the memory area and go back to the
+                        // idle state
+                        BusAction::WriteAndIdle(offset, len) => {
+                            callback(CallbackAction::Write(
+                                offset,
+                                &core.scratchpad[0..len as usize],
+                            ));
+
+                            (Self::Idle, None)
+                        }
+                        // Write the data out to the memory area and respond
+                        // with a CRC checksum
+                        BusAction::WriteAndRespondCRC(offset, len, crc) => {
+                            let res = callback(CallbackAction::Write(
+                                offset,
+                                &core.scratchpad[0..len as usize],
+                            ));
+                            if res {
+                                (Self::Idle, Some(crc.update_single_move(data).finalize()))
+                            } else {
+                                (Self::sync_lost(core), None)
+                            }
                         }
                     }
                 } else {
@@ -297,14 +334,15 @@ impl BusState {
                 let crc = crc.update_single_move(data);
 
                 if written >= length {
-                    if respond {
-                        (
-                            Self::WaitForCRC(crc.finalize(), BusAction::WriteAndRespondCRC(crc)),
-                            None,
-                        )
+                    // If we are done with the transmission, we'll take
+                    // the action and wait for the CRC
+                    let action = if respond {
+                        BusAction::WriteAndRespondCRC(offset, length, crc.clone())
                     } else {
-                        (Self::WaitForCRC(crc.finalize(), BusAction::None), None)
-                    }
+                        BusAction::WriteAndIdle(offset, length)
+                    };
+
+                    (Self::WaitForCRC(crc.finalize(), action), None)
                 } else {
                     (
                         Self::WriteData {
@@ -345,7 +383,7 @@ mod tests {
     use crate::{
         command::Command,
         crc8::{CRC8Autosar, CRC},
-        slave::{BusAction, BusState, SlaveHandle},
+        slave::{tests::common::rx_callback_panic, BusAction, BusState, SlaveHandle},
         SINGLE_START_BYTE, SYNC_MAGIC,
     };
 
@@ -357,7 +395,7 @@ mod tests {
 
         // This transition does NEVER yield a response
         assert_eq!(
-            slave.rx(SINGLE_START_BYTE),
+            slave.rx(SINGLE_START_BYTE, rx_callback_panic),
             None,
             "Idle -> Command incorrectly responds"
         );
@@ -381,24 +419,24 @@ mod tests {
             slave.core.in_sync, false,
             "in_sync is not false for new instance"
         );
-        slave.rx(SINGLE_START_BYTE);
+        slave.rx(SINGLE_START_BYTE, rx_callback_panic);
         assert!(!slave.core.in_sync, "in_sync changed unexpectedly");
 
         // Check that in_sync stays true for correct transitions
         let mut slave = SlaveHandle::<0>::default();
         slave.core.in_sync = true;
-        slave.rx(SINGLE_START_BYTE);
+        slave.rx(SINGLE_START_BYTE, rx_callback_panic);
         assert!(slave.core.in_sync, "in_sync changed unexpectedly");
 
         // Check that in_sync is stays false for incorrect bytes
         let mut slave = SlaveHandle::<0>::default();
-        slave.rx(SINGLE_START_BYTE + 0x34);
+        slave.rx(SINGLE_START_BYTE + 0x34, rx_callback_panic);
         assert!(!slave.core.in_sync, "in_sync is set for false starts");
 
         // Check that in_sync is set from true to false for incorrect bytes
         let mut slave = SlaveHandle::<0>::default();
         slave.core.in_sync = true;
-        slave.rx(SINGLE_START_BYTE + 0x34);
+        slave.rx(SINGLE_START_BYTE + 0x34, rx_callback_panic);
         assert!(
             !slave.core.in_sync,
             "in_sync is not de-asserted for false starts"
@@ -413,12 +451,12 @@ mod tests {
 
         let mut crc = CRC8Autosar::new();
 
-        assert_eq!(slave.rx(SINGLE_START_BYTE), None);
+        assert_eq!(slave.rx(SINGLE_START_BYTE, rx_callback_panic), None);
         crc.update_single(SINGLE_START_BYTE);
         assert_eq!(slave.state, BusState::WaitForCommand(crc.clone()));
 
         let cmd = Command::NOP.u8();
-        assert_eq!(slave.rx(cmd), None);
+        assert_eq!(slave.rx(cmd, rx_callback_panic), None);
         crc.update_single(cmd);
         assert_eq!(
             slave.state,
@@ -434,11 +472,11 @@ mod tests {
 
         crc.update(&[SINGLE_START_BYTE, Command::SYN.u8()]);
 
-        assert_eq!(slave.rx(SINGLE_START_BYTE), None);
-        assert_eq!(slave.rx(Command::SYN.u8()), None);
+        assert_eq!(slave.rx(SINGLE_START_BYTE, rx_callback_panic), None);
+        assert_eq!(slave.rx(Command::SYN.u8(), rx_callback_panic), None);
 
         for data in SYNC_MAGIC {
-            assert_eq!(slave.rx(data), None);
+            assert_eq!(slave.rx(data, rx_callback_panic), None);
             crc.update_single(data);
         }
 
@@ -446,7 +484,7 @@ mod tests {
             slave.state,
             BusState::WaitForCRC(crc.finalize(), BusAction::SetInSync(true))
         );
-        assert_eq!(slave.rx(crc.finalize()), None);
+        assert_eq!(slave.rx(crc.finalize(), rx_callback_panic), None);
         assert!(slave.core.in_sync)
     }
 }
