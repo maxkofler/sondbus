@@ -8,22 +8,22 @@ pub enum Command {
     NOP = 0x00,
 
     /// Sync
-    SYN = 0x10,
+    SYN = 0x01,
 
     /// Broadcast write
-    BWR = 0x14,
+    BWR = 0x05,
 
     /// Physically addressed read
-    PRD = 0x16,
+    PRD = 0x06,
 
     /// Physically addressed write
-    PWR = 0x18,
+    PWR = 0x07,
 
     /// Logically addressed read
-    LRD(u8),
+    LRD = 0x08,
 
     /// Logically addressed write
-    LWR(u8),
+    LWR = 0x09,
 }
 
 impl Command {
@@ -35,26 +35,18 @@ impl Command {
     pub fn from_u8(data: u8) -> Option<Self> {
         match data {
             0x00 => Some(Self::NOP),
-            0x10 => Some(Self::SYN),
-            0x14 => Some(Self::BWR),
-            0x16 => Some(Self::PRD),
-            0x18 => Some(Self::PWR),
-            0x20..=0x2F => Some(Self::LRD(data & 0xF)),
-            0x40..=0x4F => Some(Self::LWR(data & 0xF)),
+            0x01 => Some(Self::SYN),
+            0x05 => Some(Self::BWR),
+            0x06 => Some(Self::PRD),
+            0x07 => Some(Self::PWR),
+            0x08 => Some(Self::LRD),
+            0x09 => Some(Self::LWR),
             _ => None,
         }
     }
 
     /// Returns the `u8` representation for this command
     pub fn u8(self) -> u8 {
-        match self {
-            Self::NOP => 0x00,
-            Self::SYN => 0x10,
-            Self::BWR => 0x14,
-            Self::PRD => 0x16,
-            Self::PWR => 0x18,
-            Self::LRD(universe) => 0x20 | universe,
-            Self::LWR(universe) => 0x40 | universe,
-        }
+        self as u8
     }
 }
