@@ -93,3 +93,9 @@ impl CRC<u8> for CRC8Autosar {
         self.crc ^ CRC8_AUTOSAR_XOR_OUT
     }
 }
+
+impl From<u8> for CRC8Autosar {
+    fn from(crc: u8) -> Self {
+        Self { crc }
+    }
+}

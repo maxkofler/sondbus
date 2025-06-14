@@ -340,6 +340,8 @@ impl BusState {
 
 #[cfg(test)]
 mod tests {
+    pub mod common;
+
     use crate::{
         command::Command,
         crc8::{CRC8Autosar, CRC},
