@@ -17,19 +17,30 @@ pub enum SlaveState {
     /// Process the sync command
     Sync(usize),
 
+    /// Wait for the logical address of a write command
+    WriteLogicalAddress,
+
     /// Wait for the incoming offset of a write command
-    WriteOffset { respond: bool },
+    WriteOffset { accept: bool, respond: bool },
 
     /// Wait for the incoming length of a write command
-    WriteLength { respond: bool, offset: u8 },
+    WriteLength {
+        accept: bool,
+        respond: bool,
+        offset: u8,
+    },
 
     /// Wait and process the incoming data of a write command
     WriteData {
+        accept: bool,
         respond: bool,
         offset: u8,
         length: u8,
         written: u8,
     },
+
+    /// Wait for the CRC of a addressed read
+    WaitForWriteCRC(u8),
 
     /// Wait for the final CRC checksum of the frame
     WaitForCRC(u8, BusAction),
@@ -78,7 +89,14 @@ impl SlaveState {
                                 None,
                             ),
                             Command::SYN => (Self::Sync(0), None),
-                            Command::BWR => (Self::WriteOffset { respond: false }, None),
+                            Command::BWR => (
+                                Self::WriteOffset {
+                                    accept: true,
+                                    respond: false,
+                                },
+                                None,
+                            ),
+                            Command::LWR => (Self::WriteLogicalAddress, None),
                             _ => panic!("Unimplemented command"),
                         }
                     } else {
@@ -109,12 +127,21 @@ impl SlaveState {
                 (state, None)
             }
 
+            Self::WriteLogicalAddress => (
+                Self::WriteOffset {
+                    accept: data == core.logical_address(),
+                    respond: true,
+                },
+                None,
+            ),
+
             //
             // Wait for the incoming byte of the offset
             // to write at using a write command
             //
-            Self::WriteOffset { respond } => (
+            Self::WriteOffset { accept, respond } => (
                 Self::WriteLength {
+                    accept,
                     respond,
                     offset: data,
                 },
@@ -124,19 +151,26 @@ impl SlaveState {
             //
             // Wait for the incoming length of a write command
             //
-            Self::WriteLength { respond, offset } => {
+            Self::WriteLength {
+                accept,
+                respond,
+                offset,
+            } => {
                 // Check if we're able to fit the data into the scratchpad,
                 // otherwise, we'll loose sync as something fishy might go on
                 if data > SCRATCHPAD_SIZE as u8 {
                     (Self::sync_lost(core), None)
                 } else if data == 0 {
-                    (
-                        Self::WaitForCRC(core.crc().finalize(), BusAction::None),
-                        None,
-                    )
+                    let action = if respond {
+                        BusAction::RespondCRC
+                    } else {
+                        BusAction::None
+                    };
+                    (Self::WaitForCRC(core.crc().finalize(), action), None)
                 } else {
                     (
                         Self::WriteData {
+                            accept,
                             respond,
                             offset,
                             length: data,
@@ -151,6 +185,7 @@ impl SlaveState {
             // Wait and note the incoming data of a write command
             //
             Self::WriteData {
+                accept,
                 respond,
                 offset,
                 length,
@@ -164,7 +199,11 @@ impl SlaveState {
                     // If we are done with the transmission, we'll take
                     // the action and wait for the CRC
                     let action = if respond {
-                        BusAction::WriteAndRespondCRC(offset as u16, length, core.crc().clone())
+                        if accept {
+                            BusAction::WriteAndRespondCRC(offset as u16, length)
+                        } else {
+                            BusAction::WaitForSecondCRC
+                        }
                     } else {
                         BusAction::WriteAndIdle(offset as u16, length)
                     };
@@ -173,6 +212,7 @@ impl SlaveState {
                 } else {
                     (
                         Self::WriteData {
+                            accept,
                             respond,
                             offset,
                             length,
@@ -180,6 +220,17 @@ impl SlaveState {
                         },
                         None,
                     )
+                }
+            }
+
+            Self::WaitForWriteCRC(crc) => {
+                if data == crc {
+                    (
+                        Self::WaitForCRC(core.crc().finalize(), BusAction::None),
+                        None,
+                    )
+                } else {
+                    (Self::sync_lost(core), None)
                 }
             }
 
@@ -207,17 +258,24 @@ impl SlaveState {
                         }
                         // Write the data out to the memory area and respond
                         // with a CRC checksum
-                        BusAction::WriteAndRespondCRC(offset, len, crc) => {
+                        BusAction::WriteAndRespondCRC(offset, len) => {
                             let res = callback(CallbackAction::Write(
                                 offset,
                                 &core.scratchpad()[0..len as usize],
                             ));
                             if res {
-                                (Self::Idle, Some(crc.update_single_move(data).finalize()))
+                                (Self::Idle, Some(core.crc().finalize()))
                             } else {
                                 (Self::sync_lost(core), None)
                             }
                         }
+
+                        BusAction::RespondCRC => (Self::Idle, Some(core.crc().finalize())),
+
+                        BusAction::WaitForSecondCRC => (
+                            Self::WaitForCRC(core.crc().finalize(), BusAction::None),
+                            None,
+                        ),
                     }
                 } else {
                     (Self::sync_lost(core), None)

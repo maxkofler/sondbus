@@ -8,20 +8,30 @@ use crate::{
 #[test]
 pub fn one_length() {
     let mut slave = SlaveHandle::<1>::new_synced();
+    slave.core.set_logical_address(1);
     let mut crc = CRC8Autosar::new().update_single_move(SINGLE_START_BYTE);
 
     slave.test_rx_single_start();
-    slave.test_rx_no_response_no_callback(Command::BWR.u8());
-    crc.update_single(Command::BWR.u8());
+    slave.test_rx_no_response_no_callback(Command::LWR.u8());
+    crc.update_single(Command::LWR.u8());
+
+    // Address
+    assert_eq!(
+        slave.state(),
+        SlaveState::WriteLogicalAddress,
+        "LWR does not wait for address"
+    );
+    slave.test_rx_no_response_no_callback(1);
+    crc.update_single(1);
 
     // Offset
     assert_eq!(
         slave.state(),
         SlaveState::WriteOffset {
             accept: true,
-            respond: false
+            respond: true
         },
-        "BWR does not wait for high offset"
+        "LWR does not wait for high offset"
     );
     slave.test_rx_no_response_no_callback(0);
     crc.update_single(0);
@@ -31,10 +41,10 @@ pub fn one_length() {
         slave.state(),
         SlaveState::WriteLength {
             accept: true,
-            respond: false,
+            respond: true,
             offset: 0
         },
-        "BWR does not wait for length"
+        "LWR does not wait for length"
     );
     slave.test_rx_no_response_no_callback(0x01);
     crc.update_single(0x01);
@@ -44,53 +54,67 @@ pub fn one_length() {
         slave.state(),
         SlaveState::WriteData {
             accept: true,
-            respond: false,
+            respond: true,
             offset: 0,
             length: 1,
             written: 0
         },
-        "BWR does not wait for data"
+        "LWR does not wait for data"
     );
     slave.test_rx_no_response_no_callback(0xAA);
     crc.update_single(0xAA);
 
-    // CRC
+    // CRC Master
     assert_eq!(
         slave.state(),
-        SlaveState::WaitForCRC(crc.finalize(), BusAction::WriteAndIdle(0, 1)),
-        "BWR does not wait for CRC"
+        SlaveState::WaitForCRC(crc.finalize(), BusAction::WriteAndRespondCRC(0, 1)),
+        "LWR does not wait for CRC"
     );
     fn callback(action: CallbackAction) -> bool {
         assert_eq!(action, CallbackAction::Write(0, &[0xaa]));
         true
     }
-    slave.test_rx_no_response(crc.finalize(), &mut callback);
+    slave.test_rx_response(
+        crc.finalize(),
+        &mut callback,
+        crc.clone().update_single_move(crc.finalize()).finalize(),
+    );
 
     // Idle
     assert_eq!(
         slave.state(),
         SlaveState::Idle,
-        "BWR does not go back to idle after write"
+        "LWR does not go back to idle after write"
     );
 }
 
 #[test]
 pub fn zero_length() {
     let mut slave = SlaveHandle::<1>::new_synced();
+    slave.core.set_logical_address(1);
     let mut crc = CRC8Autosar::new().update_single_move(SINGLE_START_BYTE);
 
     slave.test_rx_single_start();
-    slave.test_rx_no_response_no_callback(Command::BWR.u8());
-    crc.update_single(Command::BWR.u8());
+    slave.test_rx_no_response_no_callback(Command::LWR.u8());
+    crc.update_single(Command::LWR.u8());
+
+    // Address
+    assert_eq!(
+        slave.state(),
+        SlaveState::WriteLogicalAddress,
+        "LWR does not wait for address"
+    );
+    slave.test_rx_no_response_no_callback(1);
+    crc.update_single(1);
 
     // Offset
     assert_eq!(
         slave.state(),
         SlaveState::WriteOffset {
             accept: true,
-            respond: false
+            respond: true
         },
-        "BWR does not wait for high offset"
+        "LWR does not wait for high offset"
     );
     slave.test_rx_no_response_no_callback(0);
     crc.update_single(0);
@@ -100,26 +124,34 @@ pub fn zero_length() {
         slave.state(),
         SlaveState::WriteLength {
             accept: true,
-            respond: false,
+            respond: true,
             offset: 0
         },
-        "BWR does not wait for length"
+        "LWR does not wait for length"
     );
     slave.test_rx_no_response_no_callback(0x0);
     crc.update_single(0x0);
 
-    // CRC
+    // CRC Master
     assert_eq!(
         slave.state(),
-        SlaveState::WaitForCRC(crc.finalize(), BusAction::None),
-        "BWR does not wait for CRC"
+        SlaveState::WaitForCRC(crc.finalize(), BusAction::RespondCRC),
+        "LWR does not wait for CRC"
     );
-    slave.test_rx_no_response_no_callback(crc.finalize());
+    fn callback(action: CallbackAction) -> bool {
+        assert_eq!(action, CallbackAction::Write(0, &[0xaa]));
+        true
+    }
+    slave.test_rx_response(
+        crc.finalize(),
+        &mut callback,
+        crc.clone().update_single_move(crc.finalize()).finalize(),
+    );
 
     // Idle
     assert_eq!(
         slave.state(),
         SlaveState::Idle,
-        "BWR does not go back to idle after write"
+        "LWR does not go back to idle after write"
     );
 }

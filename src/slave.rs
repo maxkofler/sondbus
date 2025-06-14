@@ -7,8 +7,6 @@ pub use core::*;
 mod state;
 pub use state::*;
 
-use crate::crc8::CRC8Autosar;
-
 /// The action to be performed when the bus
 /// calls back to the host application
 #[derive(Debug, PartialEq, Eq)]
@@ -31,11 +29,14 @@ pub enum BusAction {
     SetInSync(bool),
 
     /// Respond with the CRC
-    WriteAndRespondCRC(u16, u8, CRC8Autosar),
+    WriteAndRespondCRC(u16, u8),
 
     /// Write the scratchpad data using the callback
     /// and go back to idle
     WriteAndIdle(u16, u8),
+
+    RespondCRC,
+    WaitForSecondCRC,
 }
 
 #[cfg(test)]
@@ -44,6 +45,7 @@ mod tests {
 
     pub mod commands {
         pub mod bwr;
+        pub mod lwr;
     }
 
     use crate::{

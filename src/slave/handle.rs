@@ -113,6 +113,21 @@ mod test {
             }
         }
 
+        /// Test receiving `data` with an expected response and a custom callback
+        /// # Arguments
+        /// * `data` - The data to be received by the bus
+        /// * `callback` - The callback to pass the `rx()` function
+        /// * `response` - The expected response
+        pub fn test_rx_response<F: FnMut(CallbackAction) -> bool>(
+            &mut self,
+            data: u8,
+            callback: &mut F,
+            response: u8,
+        ) {
+            let res = self.rx(data, callback);
+            assert_eq!(res, Some(response), "Slave responded with wrong value")
+        }
+
         /// Receives the SINGLE_START byte and asserts that no response is
         /// given and the state transitions correctly
         pub fn test_rx_single_start(&mut self) {
@@ -139,6 +154,7 @@ mod test {
             self.core.crc().clone()
         }
 
+        /// Returns the current state that the slave is in
         pub fn state(&self) -> SlaveState {
             self.state.clone()
         }

@@ -4,6 +4,8 @@ use crate::crc8::{CRC8Autosar, CRC};
 pub struct SlaveCore<const SCRATCHPAD_SIZE: usize> {
     in_sync: bool,
     scratchpad: [u8; SCRATCHPAD_SIZE],
+    physical_address: [u8; 6],
+    logical_address: u8,
     crc: CRC8Autosar,
 }
 
@@ -12,8 +14,18 @@ impl<const S: usize> SlaveCore<S> {
         Self {
             in_sync: false,
             scratchpad: [0; S],
+            physical_address: [0; 6],
+            logical_address: 0,
             crc: CRC8Autosar::new_const(),
         }
+    }
+
+    pub fn set_logical_address(&mut self, address: u8) {
+        self.logical_address = address;
+    }
+
+    pub fn logical_address(&self) -> u8 {
+        self.logical_address
     }
 
     pub fn in_sync(&self) -> bool {
