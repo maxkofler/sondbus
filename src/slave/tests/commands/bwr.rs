@@ -16,7 +16,7 @@ pub fn one_length() {
 
     // Offset
     assert_eq!(
-        slave.state,
+        slave.state(),
         BusState::WriteOffset { respond: false },
         "BWR does not wait for high offset"
     );
@@ -25,7 +25,7 @@ pub fn one_length() {
 
     // Length
     assert_eq!(
-        slave.state,
+        slave.state(),
         BusState::WriteLength {
             respond: false,
             offset: 0
@@ -37,7 +37,7 @@ pub fn one_length() {
 
     // Data: 0xAA
     assert_eq!(
-        slave.state,
+        slave.state(),
         BusState::WriteData {
             respond: false,
             offset: 0,
@@ -51,7 +51,7 @@ pub fn one_length() {
 
     // CRC
     assert_eq!(
-        slave.state,
+        slave.state(),
         BusState::WaitForCRC(crc.finalize(), BusAction::WriteAndIdle(0, 1)),
         "BWR does not wait for CRC"
     );
@@ -63,7 +63,7 @@ pub fn one_length() {
 
     // Idle
     assert_eq!(
-        slave.state,
+        slave.state(),
         BusState::Idle,
         "BWR does not go back to idle after write"
     );
@@ -80,7 +80,7 @@ pub fn zero_length() {
 
     // Offset
     assert_eq!(
-        slave.state,
+        slave.state(),
         BusState::WriteOffset { respond: false },
         "BWR does not wait for high offset"
     );
@@ -89,7 +89,7 @@ pub fn zero_length() {
 
     // Length
     assert_eq!(
-        slave.state,
+        slave.state(),
         BusState::WriteLength {
             respond: false,
             offset: 0
@@ -101,7 +101,7 @@ pub fn zero_length() {
 
     // CRC
     assert_eq!(
-        slave.state,
+        slave.state(),
         BusState::WaitForCRC(crc.finalize(), BusAction::None),
         "BWR does not wait for CRC"
     );
@@ -109,7 +109,7 @@ pub fn zero_length() {
 
     // Idle
     assert_eq!(
-        slave.state,
+        slave.state(),
         BusState::Idle,
         "BWR does not go back to idle after write"
     );
