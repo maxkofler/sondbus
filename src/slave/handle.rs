@@ -128,6 +128,14 @@ mod test {
             assert_eq!(res, Some(response), "Slave responded with wrong value")
         }
 
+        /// Tests receiving `data` with a response and no callback expected
+        /// # Arguments
+        /// * `data` - The data to be received by the bus
+        pub fn test_rx_no_callback(&mut self, data: u8, response: u8) {
+            let res = self.rx(data, rx_callback_panic);
+            assert_eq!(res, Some(response), "Slave responded with wrong value")
+        }
+
         /// Receives the SINGLE_START byte and asserts that no response is
         /// given and the state transitions correctly
         pub fn test_rx_single_start(&mut self) {
@@ -152,6 +160,11 @@ mod test {
         /// Returns the current CRC of the bus
         pub fn cur_crc(&self) -> CRC8Autosar {
             self.core.crc().clone()
+        }
+
+        /// Asserts that the slave is in the provided state
+        pub fn assert_state(&self, state: SlaveState) {
+            assert_eq!(self.state, state, "Slave is not in expected state")
         }
 
         /// Returns the current state that the slave is in

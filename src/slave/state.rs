@@ -162,7 +162,11 @@ impl SlaveState {
                     (Self::sync_lost(core), None)
                 } else if data == 0 {
                     let action = if respond {
-                        BusAction::RespondCRC
+                        if accept {
+                            BusAction::RespondCRC
+                        } else {
+                            BusAction::WaitForSecondCRC
+                        }
                     } else {
                         BusAction::None
                     };
