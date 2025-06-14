@@ -42,19 +42,16 @@ pub enum BusState {
     /// Process the sync command
     Sync(usize),
 
-    /// Wait for the high byte of the incoming offset of a write command
-    WriteOffsetH { respond: bool },
-
-    /// Wait for the low byte of the incoming offset of a write command
-    WriteOffsetL { respond: bool, offset: u8 },
+    /// Wait for the incoming offset of a write command
+    WriteOffset { respond: bool },
 
     /// Wait for the incoming length of a write command
-    WriteLength { respond: bool, offset: u16 },
+    WriteLength { respond: bool, offset: u8 },
 
     /// Wait and process the incoming data of a write command
     WriteData {
         respond: bool,
-        offset: u16,
+        offset: u8,
         length: u8,
         written: u8,
     },
@@ -176,7 +173,7 @@ impl BusState {
                                 (Self::WaitForCRC(core.crc.finalize(), BusAction::None), None)
                             }
                             Command::SYN => (Self::Sync(0), None),
-                            Command::BWR => (Self::WriteOffsetH { respond: false }, None),
+                            Command::BWR => (Self::WriteOffset { respond: false }, None),
                             _ => panic!("Unimplemented command"),
                         }
                     } else {
@@ -249,25 +246,13 @@ impl BusState {
             }
 
             //
-            // Wait for the incoming high byte of the offset
+            // Wait for the incoming byte of the offset
             // to write at using a write command
             //
-            Self::WriteOffsetH { respond } => (
-                Self::WriteOffsetL {
-                    respond,
-                    offset: data,
-                },
-                None,
-            ),
-
-            //
-            // Wait for the incoming low byte of the offset
-            // to write at using a write command
-            //
-            Self::WriteOffsetL { respond, offset } => (
+            Self::WriteOffset { respond } => (
                 Self::WriteLength {
                     respond,
-                    offset: (offset as u16) << 8 | data as u16,
+                    offset: data,
                 },
                 None,
             ),
@@ -310,9 +295,9 @@ impl BusState {
                     // If we are done with the transmission, we'll take
                     // the action and wait for the CRC
                     let action = if respond {
-                        BusAction::WriteAndRespondCRC(offset, length, core.crc.clone())
+                        BusAction::WriteAndRespondCRC(offset as u16, length, core.crc.clone())
                     } else {
-                        BusAction::WriteAndIdle(offset, length)
+                        BusAction::WriteAndIdle(offset as u16, length)
                     };
 
                     (Self::WaitForCRC(core.crc.finalize(), action), None)
@@ -351,6 +336,10 @@ impl BusState {
 #[cfg(test)]
 mod tests {
     pub mod common;
+
+    pub mod commands {
+        pub mod bwr;
+    }
 
     use crate::{
         command::Command,

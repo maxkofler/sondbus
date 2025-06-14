@@ -14,27 +14,11 @@ pub fn one_length() {
     slave.test_rx_no_response_no_callback(Command::BWR.u8());
     crc.update_single(Command::BWR.u8());
 
-    // Offset High
+    // Offset
     assert_eq!(
         slave.state,
-        BusState::WriteOffsetH {
-            crc: crc.clone(),
-            respond: false
-        },
+        BusState::WriteOffset { respond: false },
         "BWR does not wait for high offset"
-    );
-    slave.test_rx_no_response_no_callback(0);
-    crc.update_single(0);
-
-    // Offset Low
-    assert_eq!(
-        slave.state,
-        BusState::WriteOffsetL {
-            crc: crc.clone(),
-            offset: 0,
-            respond: false
-        },
-        "BWR does not wait for low offset"
     );
     slave.test_rx_no_response_no_callback(0);
     crc.update_single(0);
@@ -43,7 +27,6 @@ pub fn one_length() {
     assert_eq!(
         slave.state,
         BusState::WriteLength {
-            crc: crc.clone(),
             respond: false,
             offset: 0
         },
@@ -56,7 +39,6 @@ pub fn one_length() {
     assert_eq!(
         slave.state,
         BusState::WriteData {
-            crc: crc.clone(),
             respond: false,
             offset: 0,
             length: 1,
