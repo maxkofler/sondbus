@@ -265,6 +265,8 @@ impl BusState {
                 // otherwise, we'll loose sync as something fishy might go on
                 if data > SCRATCHPAD_SIZE as u8 {
                     (Self::sync_lost(core), None)
+                } else if data == 0 {
+                    (Self::WaitForCRC(core.crc.finalize(), BusAction::None), None)
                 } else {
                     (
                         Self::WriteData {

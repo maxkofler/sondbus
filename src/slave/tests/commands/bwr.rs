@@ -68,3 +68,49 @@ pub fn one_length() {
         "BWR does not go back to idle after write"
     );
 }
+
+#[test]
+pub fn zero_length() {
+    let mut slave = SlaveHandle::<1>::new_synced();
+    let mut crc = CRC8Autosar::new().update_single_move(SINGLE_START_BYTE);
+
+    slave.test_rx_single_start();
+    slave.test_rx_no_response_no_callback(Command::BWR.u8());
+    crc.update_single(Command::BWR.u8());
+
+    // Offset
+    assert_eq!(
+        slave.state,
+        BusState::WriteOffset { respond: false },
+        "BWR does not wait for high offset"
+    );
+    slave.test_rx_no_response_no_callback(0);
+    crc.update_single(0);
+
+    // Length
+    assert_eq!(
+        slave.state,
+        BusState::WriteLength {
+            respond: false,
+            offset: 0
+        },
+        "BWR does not wait for length"
+    );
+    slave.test_rx_no_response_no_callback(0x0);
+    crc.update_single(0x0);
+
+    // CRC
+    assert_eq!(
+        slave.state,
+        BusState::WaitForCRC(crc.finalize(), BusAction::None),
+        "BWR does not wait for CRC"
+    );
+    slave.test_rx_no_response_no_callback(crc.finalize());
+
+    // Idle
+    assert_eq!(
+        slave.state,
+        BusState::Idle,
+        "BWR does not go back to idle after write"
+    );
+}
