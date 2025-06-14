@@ -39,9 +39,6 @@ pub enum SlaveState {
         written: u8,
     },
 
-    /// Wait for the CRC of a addressed read
-    WaitForWriteCRC(u8),
-
     /// Wait for the final CRC checksum of the frame
     WaitForCRC(u8, BusAction),
 }
@@ -127,6 +124,9 @@ impl SlaveState {
                 (state, None)
             }
 
+            //
+            // Wait for the logical address of a write command
+            //
             Self::WriteLogicalAddress => (
                 Self::WriteOffset {
                     accept: data == core.logical_address(),
@@ -224,17 +224,6 @@ impl SlaveState {
                         },
                         None,
                     )
-                }
-            }
-
-            Self::WaitForWriteCRC(crc) => {
-                if data == crc {
-                    (
-                        Self::WaitForCRC(core.crc().finalize(), BusAction::None),
-                        None,
-                    )
-                } else {
-                    (Self::sync_lost(core), None)
                 }
             }
 
