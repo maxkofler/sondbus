@@ -67,11 +67,17 @@ impl Default for CRC8Autosar {
     }
 }
 
-impl CRC<u8> for CRC8Autosar {
-    fn new() -> Self {
+impl CRC8Autosar {
+    pub const fn new_const() -> Self {
         Self {
             crc: CRC8_AUTOSAR_INIT,
         }
+    }
+}
+
+impl CRC<u8> for CRC8Autosar {
+    fn new() -> Self {
+        Self::new_const()
     }
 
     fn reset(&mut self) {

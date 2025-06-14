@@ -27,6 +27,7 @@ pub struct SlaveHandle<const SCRATCHPAD_SIZE: usize> {
 pub struct SlaveCore<const SCRATCHPAD_SIZE: usize> {
     in_sync: bool,
     scratchpad: [u8; SCRATCHPAD_SIZE],
+    crc: CRC8Autosar,
 }
 
 #[derive(PartialEq, Debug, Default)]
@@ -36,31 +37,22 @@ pub enum BusState {
     Idle,
 
     /// Wait for the command byte and parse it
-    WaitForCommand(CRC8Autosar),
+    WaitForCommand,
 
     /// Process the sync command
-    Sync(CRC8Autosar, usize),
+    Sync(usize),
 
     /// Wait for the high byte of the incoming offset of a write command
-    WriteOffsetH { crc: CRC8Autosar, respond: bool },
+    WriteOffsetH { respond: bool },
 
     /// Wait for the low byte of the incoming offset of a write command
-    WriteOffsetL {
-        crc: CRC8Autosar,
-        respond: bool,
-        offset: u8,
-    },
+    WriteOffsetL { respond: bool, offset: u8 },
 
     /// Wait for the incoming length of a write command
-    WriteLength {
-        crc: CRC8Autosar,
-        respond: bool,
-        offset: u16,
-    },
+    WriteLength { respond: bool, offset: u16 },
 
     /// Wait and process the incoming data of a write command
     WriteData {
-        crc: CRC8Autosar,
         respond: bool,
         offset: u16,
         length: u8,
@@ -98,6 +90,7 @@ impl<const SCRATCHPAD_SIZE: usize> SlaveHandle<SCRATCHPAD_SIZE> {
             core: SlaveCore {
                 in_sync: false,
                 scratchpad: [0u8; SCRATCHPAD_SIZE],
+                crc: CRC8Autosar::new_const(),
             },
         }
     }
@@ -149,6 +142,8 @@ impl BusState {
         core: &mut SlaveCore<SCRATCHPAD_SIZE>,
         mut callback: F,
     ) -> (Self, Option<u8>) {
+        core.crc.update_single(data);
+
         match self {
             //
             // In the idle state, we essentially wait for the start byte.
@@ -157,7 +152,8 @@ impl BusState {
             //
             Self::Idle => (
                 if data == SINGLE_START_BYTE {
-                    Self::WaitForCommand(CRC8Autosar::new().update_single_move(data))
+                    core.crc = CRC8Autosar::new().update_single_move(data);
+                    Self::WaitForCommand
                 } else {
                     Self::sync_lost(core)
                 },
@@ -169,26 +165,18 @@ impl BusState {
             // and parse it. If that fails (unknown command)
             // we'll return to the Idle state
             //
-            Self::WaitForCommand(crc) => match Command::from_u8(data) {
+            Self::WaitForCommand => match Command::from_u8(data) {
                 Some(cmd) => {
-                    let crc = crc.update_single_move(data);
-
                     // We only handle a command if we are in sync or
                     // it is a `SYN` command. Otherwise we'll fall out
                     // of sync again just to be sure
                     if core.in_sync || cmd == Command::SYN {
                         match cmd {
                             Command::NOP => {
-                                (Self::WaitForCRC(crc.finalize(), BusAction::None), None)
+                                (Self::WaitForCRC(core.crc.finalize(), BusAction::None), None)
                             }
-                            Command::SYN => (Self::Sync(crc, 0), None),
-                            Command::BWR => (
-                                Self::WriteOffsetH {
-                                    crc,
-                                    respond: false,
-                                },
-                                None,
-                            ),
+                            Command::SYN => (Self::Sync(0), None),
+                            Command::BWR => (Self::WriteOffsetH { respond: false }, None),
                             _ => panic!("Unimplemented command"),
                         }
                     } else {
@@ -205,14 +193,12 @@ impl BusState {
             // If we receive any wrong byte, immediately loose
             // sync.
             //
-            Self::Sync(crc, pos) => {
-                let crc = crc.update_single_move(data);
-
+            Self::Sync(pos) => {
                 let state = if SYNC_MAGIC[pos] == data {
                     if pos >= 14 {
-                        Self::WaitForCRC(crc.finalize(), BusAction::SetInSync(true))
+                        Self::WaitForCRC(core.crc.finalize(), BusAction::SetInSync(true))
                     } else {
-                        Self::Sync(crc, pos + 1)
+                        Self::Sync(pos + 1)
                     }
                 } else {
                     Self::sync_lost(core)
@@ -266,9 +252,8 @@ impl BusState {
             // Wait for the incoming high byte of the offset
             // to write at using a write command
             //
-            Self::WriteOffsetH { crc, respond } => (
+            Self::WriteOffsetH { respond } => (
                 Self::WriteOffsetL {
-                    crc: crc.update_single_move(data),
                     respond,
                     offset: data,
                 },
@@ -279,13 +264,8 @@ impl BusState {
             // Wait for the incoming low byte of the offset
             // to write at using a write command
             //
-            Self::WriteOffsetL {
-                crc,
-                respond,
-                offset,
-            } => (
+            Self::WriteOffsetL { respond, offset } => (
                 Self::WriteLength {
-                    crc: crc.update_single_move(data),
                     respond,
                     offset: (offset as u16) << 8 | data as u16,
                 },
@@ -295,11 +275,7 @@ impl BusState {
             //
             // Wait for the incoming length of a write command
             //
-            Self::WriteLength {
-                crc,
-                respond,
-                offset,
-            } => {
+            Self::WriteLength { respond, offset } => {
                 // Check if we're able to fit the data into the scratchpad,
                 // otherwise, we'll loose sync as something fishy might go on
                 if data > SCRATCHPAD_SIZE as u8 {
@@ -307,7 +283,6 @@ impl BusState {
                 } else {
                     (
                         Self::WriteData {
-                            crc: crc.update_single_move(data),
                             respond,
                             offset,
                             length: data,
@@ -322,7 +297,6 @@ impl BusState {
             // Wait and note the incoming data of a write command
             //
             Self::WriteData {
-                crc,
                 respond,
                 offset,
                 length,
@@ -331,22 +305,20 @@ impl BusState {
                 core.scratchpad[written as usize] = data;
 
                 let written = written + 1;
-                let crc = crc.update_single_move(data);
 
                 if written >= length {
                     // If we are done with the transmission, we'll take
                     // the action and wait for the CRC
                     let action = if respond {
-                        BusAction::WriteAndRespondCRC(offset, length, crc.clone())
+                        BusAction::WriteAndRespondCRC(offset, length, core.crc.clone())
                     } else {
                         BusAction::WriteAndIdle(offset, length)
                     };
 
-                    (Self::WaitForCRC(crc.finalize(), action), None)
+                    (Self::WaitForCRC(core.crc.finalize(), action), None)
                 } else {
                     (
                         Self::WriteData {
-                            crc,
                             respond,
                             offset,
                             length,
@@ -403,7 +375,7 @@ mod tests {
         // Check that the internal state moved to the correct next state
         assert_eq!(
             slave.state,
-            BusState::WaitForCommand(CRC8Autosar::new().update_single_move(SINGLE_START_BYTE)),
+            BusState::WaitForCommand,
             "Idle -> Command does not happen correctly"
         )
     }
@@ -415,10 +387,7 @@ mod tests {
     fn idle_to_cmd_sync() {
         // Check that in_sync stays false for correct transitions
         let mut slave = SlaveHandle::<0>::default();
-        assert_eq!(
-            slave.core.in_sync, false,
-            "in_sync is not false for new instance"
-        );
+        assert!(!slave.core.in_sync, "in_sync is not false for new instance");
         slave.rx(SINGLE_START_BYTE, rx_callback_panic);
         assert!(!slave.core.in_sync, "in_sync changed unexpectedly");
 
@@ -453,7 +422,7 @@ mod tests {
 
         assert_eq!(slave.rx(SINGLE_START_BYTE, rx_callback_panic), None);
         crc.update_single(SINGLE_START_BYTE);
-        assert_eq!(slave.state, BusState::WaitForCommand(crc.clone()));
+        assert_eq!(slave.state, BusState::WaitForCommand);
 
         let cmd = Command::NOP.u8();
         assert_eq!(slave.rx(cmd, rx_callback_panic), None);

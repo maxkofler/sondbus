@@ -57,7 +57,7 @@ impl<const S: usize> SlaveHandle<S> {
         self.test_rx_no_response_no_callback(SINGLE_START_BYTE);
         assert_eq!(
             self.state,
-            BusState::WaitForCommand(CRC8Autosar::new().update_single_move(SINGLE_START_BYTE)),
+            BusState::WaitForCommand,
             "Does not react to start byte"
         );
     }
@@ -69,36 +69,14 @@ impl<const S: usize> SlaveHandle<S> {
             core: SlaveCore {
                 in_sync: true,
                 scratchpad: [0; S],
+                crc: CRC8Autosar::new(),
             },
         }
     }
 
     /// Returns the current CRC of the bus
     pub fn cur_crc(&self) -> CRC8Autosar {
-        match &self.state {
-            BusState::Idle => CRC8Autosar::new(),
-            BusState::WaitForCommand(crc) => crc.clone(),
-            BusState::Sync(crc, _) => crc.clone(),
-            BusState::WriteOffsetH { crc, respond: _ } => crc.clone(),
-            BusState::WriteOffsetL {
-                crc,
-                respond: _,
-                offset: _,
-            } => crc.clone(),
-            BusState::WriteLength {
-                crc,
-                respond: _,
-                offset: _,
-            } => crc.clone(),
-            BusState::WriteData {
-                crc,
-                respond: _,
-                offset: _,
-                length: _,
-                written: _,
-            } => crc.clone(),
-            BusState::WaitForCRC(crc, _) => (*crc).into(),
-        }
+        self.core.crc.clone()
     }
 }
 
