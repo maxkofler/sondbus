@@ -1,7 +1,9 @@
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 /// The start byte for single-command frames
 pub const SINGLE_START_BYTE: u8 = 0x55;
+
+pub const SERIAL_DEFAULT_BAUD: usize = 9600;
 
 /// The `magic` field of the sync command
 pub const SYNC_MAGIC: [u8; 15] = [
@@ -11,6 +13,9 @@ pub const SYNC_MAGIC: [u8; 15] = [
 pub mod command;
 pub mod crc8;
 pub mod slave;
+
+#[cfg(feature = "master")]
+pub mod master;
 
 #[cfg(test)]
 mod tests {

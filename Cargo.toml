@@ -3,7 +3,15 @@ name = "sondbus"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+"std" = []
+"master" = ["std"]
+serial2 = ["dep:serial2"]
+
+"master-transport-serial" = ["dep:serial2"]
+
 [dependencies]
 replace_with = { version = "0.1.8", default-features = false, features = [
     "panic_abort",
 ] }
+serial2 = { version = "0.2.29", optional = true }
