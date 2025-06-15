@@ -37,6 +37,9 @@ pub enum BusAction {
 
     RespondCRC,
     WaitForSecondCRC,
+
+    ReadAndRespond(u16, u8),
+    WaitForOtherRead(u8),
 }
 
 #[cfg(test)]
@@ -45,6 +48,7 @@ mod tests {
 
     pub mod commands {
         pub mod bwr;
+        pub mod lrd;
         pub mod lwr;
     }
 

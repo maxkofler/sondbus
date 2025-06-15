@@ -20,8 +20,14 @@ pub enum SlaveState {
     /// Wait for the logical address of a write command
     WriteLogicalAddress,
 
+    /// Wait for the logical address of a read command
+    ReadLogicalAddress,
+
     /// Wait for the incoming offset of a write command
     WriteOffset { accept: bool, respond: bool },
+
+    /// Wait for the incoming offset of a read command
+    ReadOffset { accept: bool },
 
     /// Wait for the incoming length of a write command
     WriteLength {
@@ -29,6 +35,9 @@ pub enum SlaveState {
         respond: bool,
         offset: u8,
     },
+
+    /// Wait for the incoming length of a read command
+    ReadLength { accept: bool, offset: u8 },
 
     /// Wait and process the incoming data of a write command
     WriteData {
@@ -39,8 +48,17 @@ pub enum SlaveState {
         written: u8,
     },
 
+    /// Send the read data
+    SendReadData { length: u8, sent: u8 },
+
+    /// Wait and process the read data of another slave
+    ReceiveReadData { length: u8, sent: u8 },
+
     /// Wait for the final CRC checksum of the frame
     WaitForCRC(u8, BusAction),
+
+    /// Send the crc upon the next possibility
+    SendCRC(u8),
 }
 
 impl SlaveState {
@@ -94,6 +112,7 @@ impl SlaveState {
                                 None,
                             ),
                             Command::LWR => (Self::WriteLogicalAddress, None),
+                            Command::LRD => (Self::ReadLogicalAddress, None),
                             _ => panic!("Unimplemented command"),
                         }
                     } else {
@@ -136,6 +155,16 @@ impl SlaveState {
             ),
 
             //
+            // Wait for the logical address of a read command
+            //
+            Self::ReadLogicalAddress => (
+                Self::ReadOffset {
+                    accept: data == core.logical_address(),
+                },
+                None,
+            ),
+
+            //
             // Wait for the incoming byte of the offset
             // to write at using a write command
             //
@@ -143,6 +172,18 @@ impl SlaveState {
                 Self::WriteLength {
                     accept,
                     respond,
+                    offset: data,
+                },
+                None,
+            ),
+
+            //
+            // Wait for the incoming byte of the offset
+            // to read at using a read command
+            //
+            Self::ReadOffset { accept } => (
+                Self::ReadLength {
+                    accept,
                     offset: data,
                 },
                 None,
@@ -184,6 +225,28 @@ impl SlaveState {
                     )
                 }
             }
+
+            //
+            // Wait for the incoming length of a read command
+            //
+            Self::ReadLength { accept, offset } => (
+                {
+                    let action = if accept {
+                        if data == 0 {
+                            BusAction::RespondCRC
+                        } else {
+                            BusAction::ReadAndRespond(offset as u16, data)
+                        }
+                    } else if data == 0 {
+                        BusAction::WaitForSecondCRC
+                    } else {
+                        BusAction::WaitForOtherRead(data)
+                    };
+
+                    Self::WaitForCRC(core.crc().finalize(), action)
+                },
+                None,
+            ),
 
             //
             // Wait and note the incoming data of a write command
@@ -269,11 +332,68 @@ impl SlaveState {
                             Self::WaitForCRC(core.crc().finalize(), BusAction::None),
                             None,
                         ),
+
+                        BusAction::ReadAndRespond(offset, len) => {
+                            callback(CallbackAction::Read(
+                                offset,
+                                &mut core.scratchpad_mut()[0..len as usize],
+                            ));
+
+                            core.update_crc_single(core.scratchpad()[0]);
+
+                            let state = if len > 1 {
+                                Self::SendReadData {
+                                    length: len,
+                                    sent: 1,
+                                }
+                            } else {
+                                Self::SendCRC(core.crc().finalize())
+                            };
+
+                            (state, Some(core.scratchpad()[0]))
+                        }
+
+                        BusAction::WaitForOtherRead(length) => {
+                            (Self::ReceiveReadData { length, sent: 0 }, None)
+                        }
                     }
                 } else {
                     (Self::sync_lost(core), None)
                 }
             }
+
+            //
+            // We should never receive anything in the send read data
+            // state. If we do, we're out of sync
+            //
+            Self::SendReadData { length: _, sent: _ } => (Self::sync_lost(core), None),
+
+            //
+            // Receive and wait for the receive data of another
+            // slave to go through
+            //
+            Self::ReceiveReadData { length, sent } => {
+                if sent >= length - 1 {
+                    (
+                        Self::WaitForCRC(core.crc().finalize(), BusAction::None),
+                        None,
+                    )
+                } else {
+                    (
+                        Self::ReceiveReadData {
+                            length,
+                            sent: sent + 1,
+                        },
+                        None,
+                    )
+                }
+            }
+
+            //
+            // We should never receive when we're sending the CRC
+            // ourselves. If we do, we're out of sync
+            //
+            Self::SendCRC(_crc) => (Self::sync_lost(core), None),
         }
     }
 
@@ -287,8 +407,27 @@ impl SlaveState {
         Self::Idle
     }
 
-    pub fn tx(self) -> (Self, Option<u8>) {
+    pub fn tx<const SCRATCHPAD_SIZE: usize>(
+        self,
+        core: &mut SlaveCore<SCRATCHPAD_SIZE>,
+    ) -> (Self, Option<u8>) {
         match self {
+            Self::SendReadData { length, sent } => {
+                let data = core.scratchpad()[sent as usize];
+                core.update_crc_single(data);
+
+                let state = if length >= sent {
+                    SlaveState::SendCRC(core.crc().finalize())
+                } else {
+                    SlaveState::SendReadData {
+                        length,
+                        sent: sent + 1,
+                    }
+                };
+
+                (state, Some(data))
+            }
+            Self::SendCRC(crc) => (Self::Idle, Some(crc)),
             x => (x, None),
         }
     }

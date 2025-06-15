@@ -4,6 +4,7 @@ use crate::crc8::{CRC8Autosar, CRC};
 pub struct SlaveCore<const SCRATCHPAD_SIZE: usize> {
     in_sync: bool,
     scratchpad: [u8; SCRATCHPAD_SIZE],
+    #[allow(dead_code)]
     physical_address: [u8; 6],
     logical_address: u8,
     crc: CRC8Autosar,

@@ -44,7 +44,7 @@ impl<const SCRATCHPAD_SIZE: usize> SlaveHandle<SCRATCHPAD_SIZE> {
         let mut response = None;
 
         replace_with_or_abort(&mut self.state, |s| {
-            let (s, r) = s.tx();
+            let (s, r) = s.tx(&mut self.core);
             response = r;
             s
         });
@@ -145,6 +145,12 @@ mod test {
                 SlaveState::WaitForCommand,
                 "Does not react to start byte"
             );
+        }
+
+        pub fn test_tx_no_callback(&mut self, response: u8) {
+            let res = self.tx();
+            assert_ne!(res, None, "Slave responded not at all when it should");
+            assert_eq!(res, Some(response), "Slave responded with wrong value")
         }
 
         /// Creates a new `SlaveHandle` that is already in sync
