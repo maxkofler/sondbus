@@ -1,13 +1,16 @@
 //! The transceiver implements the lowest layer of the sondbus communication protocol
 //! and handles synchronization of the communication and memory access.
 
+#[cfg(test)]
+mod test;
+
 use crate::crc8::CRC8Autosar;
 
 type StateFunction = fn(&mut TransceiverContext, rx: Option<u8>) -> Option<u8>;
 const STATES: [StateFunction; 1] = [wait_for_start];
 
 #[repr(usize)]
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 enum State {
     WaitForStart = 0,
     WaitForCommand = 1,
