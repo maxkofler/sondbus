@@ -16,13 +16,15 @@ enum State {
 pub struct TransceiverContext {
     state: State,
     crc: CRC8Autosar,
+    scratchpad: &'static [u8],
 }
 
 impl TransceiverContext {
-    pub const fn new() -> Self {
+    pub const fn new(scratchpad: &'static [u8]) -> Self {
         Self {
             state: State::WaitForStart,
             crc: CRC8Autosar::new_const(),
+            scratchpad,
         }
     }
 
