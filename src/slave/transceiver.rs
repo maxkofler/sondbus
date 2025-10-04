@@ -13,6 +13,11 @@ use crate::{
 use command::Command;
 
 type StateFunction = fn(&mut Transceiver, rx: Option<u8>) -> Option<u8>;
+
+/// Enumerates the state functions that the control flow
+/// jumps to for the individual states.
+///
+/// Make sure that the order is EXACTLY the same as in [State]
 const STATES: [StateFunction; 4] = [
     state_wait_for_start,
     state_wait_for_cmd,
@@ -20,6 +25,9 @@ const STATES: [StateFunction; 4] = [
     state_wait_for_crc,
 ];
 
+/// Enumerates the possible states the [Transceiver] can be in
+///
+/// Make sure that the order is EXACTLY the same as in [STATES]
 #[repr(usize)]
 #[derive(Clone, PartialEq, Debug)]
 enum State {
