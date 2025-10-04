@@ -1,13 +1,13 @@
 use crate::{
     crc8::{CRC8Autosar, CRC},
-    slave::transceiver::{State, TransceiverContext},
+    slave::transceiver::{State, Transceiver},
     SYNC_SEQUENCE,
 };
 
 static SCRATCHPAD: [u8; 0xF] = [0u8; 0xF];
 
-pub fn new_transceiver() -> TransceiverContext {
-    TransceiverContext::new(&SCRATCHPAD)
+pub fn new_transceiver() -> Transceiver {
+    Transceiver::new(&SCRATCHPAD)
 }
 
 #[test]

@@ -12,7 +12,7 @@ use crate::{
 };
 use command::Command;
 
-type StateFunction = fn(&mut TransceiverContext, rx: Option<u8>) -> Option<u8>;
+type StateFunction = fn(&mut Transceiver, rx: Option<u8>) -> Option<u8>;
 const STATES: [StateFunction; 4] = [
     state_wait_for_start,
     state_wait_for_cmd,
@@ -29,7 +29,7 @@ enum State {
     WaitForCRC,
 }
 
-pub struct TransceiverContext {
+pub struct Transceiver {
     state: State,
     crc: CRC8Autosar,
     cur_cmd: Command,
@@ -40,7 +40,7 @@ pub struct TransceiverContext {
     scratchpad: &'static [u8],
 }
 
-impl TransceiverContext {
+impl Transceiver {
     pub const fn new(scratchpad: &'static [u8]) -> Self {
         Self {
             state: State::WaitForStart,
@@ -70,7 +70,7 @@ impl TransceiverContext {
     }
 }
 
-fn state_wait_for_start(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
+fn state_wait_for_start(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         if rx == 0x55 {
             ctx.state = State::WaitForCommand;
@@ -81,7 +81,7 @@ fn state_wait_for_start(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<
     None
 }
 
-fn state_wait_for_cmd(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
+fn state_wait_for_cmd(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         ctx.cur_cmd = Command::new(rx);
 
@@ -107,7 +107,7 @@ fn state_wait_for_cmd(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8
     None
 }
 
-fn state_sync(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
+fn state_sync(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         if ctx.pos <= 14 {
             if rx != SYNC_SEQUENCE[ctx.pos as usize] {
@@ -130,7 +130,7 @@ fn state_sync(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
     None
 }
 
-fn state_wait_for_crc(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
+fn state_wait_for_crc(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         ctx.state = State::WaitForStart;
 
