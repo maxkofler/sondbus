@@ -1,7 +1,7 @@
 //! The transceiver implements the lowest layer of the sondbus communication protocol
 //! and handles synchronization of the communication and memory access.
 
-pub mod command;
+mod command;
 
 #[cfg(test)]
 mod test;
@@ -37,6 +37,10 @@ enum State {
     WaitForCRC,
 }
 
+/// Represents a transceiver in the sondbus model.
+///
+/// The transceiver implements the lowest layer of the sondbus communication protocol
+/// and handles synchronization of the communication and slave memory access.
 pub struct Transceiver {
     state: State,
     crc: CRC8Autosar,
@@ -49,6 +53,9 @@ pub struct Transceiver {
 }
 
 impl Transceiver {
+    /// Creates a new transceiver
+    /// # Arguments
+    /// * `scratchpad` - The scratchpad memory to operate on
     pub const fn new(scratchpad: &'static [u8]) -> Self {
         Self {
             state: State::WaitForStart,
@@ -62,10 +69,18 @@ impl Transceiver {
         }
     }
 
+    /// Sets the internal `in_sync` flag false, effectively
+    /// taking the transceiver offline until the next `Sync`
+    /// command comes around from the master
     pub fn loose_sync(&mut self) {
         self.in_sync = false;
     }
 
+    /// Process some event in the state machine of the transceiver.
+    /// # Arguments
+    /// * `rx` - An incoming byte from the physical layer
+    /// # Returns
+    /// A byte to be sent via the physical layer, if any
     pub fn handle(&mut self, rx: Option<u8>) -> Option<u8> {
         let state = self.state.clone() as usize;
         let res = STATES[state](self, rx);
