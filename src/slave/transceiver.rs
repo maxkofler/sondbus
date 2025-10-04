@@ -13,7 +13,12 @@ use crate::{
 use command::Command;
 
 type StateFunction = fn(&mut TransceiverContext, rx: Option<u8>) -> Option<u8>;
-const STATES: [StateFunction; 4] = [wait_for_start, wait_for_cmd, state_sync, wait_for_crc];
+const STATES: [StateFunction; 4] = [
+    state_wait_for_start,
+    state_wait_for_cmd,
+    state_sync,
+    state_wait_for_crc,
+];
 
 #[repr(usize)]
 #[derive(Clone, PartialEq, Debug)]
@@ -65,7 +70,7 @@ impl TransceiverContext {
     }
 }
 
-fn wait_for_start(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
+fn state_wait_for_start(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         if rx == 0x55 {
             ctx.state = State::WaitForCommand;
@@ -76,7 +81,7 @@ fn wait_for_start(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
     None
 }
 
-fn wait_for_cmd(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
+fn state_wait_for_cmd(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         ctx.cur_cmd = Command::new(rx);
 
@@ -125,7 +130,7 @@ fn state_sync(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
     None
 }
 
-fn wait_for_crc(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
+fn state_wait_for_crc(ctx: &mut TransceiverContext, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         ctx.state = State::WaitForStart;
 
