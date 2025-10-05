@@ -1,3 +1,5 @@
+pub mod memory;
+
 pub struct Command {
     value: u8,
 }
@@ -5,6 +7,10 @@ pub struct Command {
 impl Command {
     pub const fn new(value: u8) -> Self {
         Self { value }
+    }
+
+    pub fn raw(&self) -> u8 {
+        self.value
     }
 
     pub fn is_mem_cmd(&self) -> bool {
