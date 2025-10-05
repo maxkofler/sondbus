@@ -4,10 +4,25 @@ use crate::{
     SYNC_SEQUENCE,
 };
 
+mod mem_cmd;
+
 static SCRATCHPAD: [u8; 0xF] = [0u8; 0xF];
 
 pub fn new_transceiver() -> Transceiver {
     Transceiver::new(&SCRATCHPAD)
+}
+
+impl Transceiver {
+    fn test_rx_no_response(&mut self, value: u8) {
+        let res = self.handle(Some(value));
+        assert!(res.is_none(), "Transceiver responded when it should not");
+    }
+
+    fn test_rx_multi_no_response(&mut self, values: &[u8]) {
+        for value in values {
+            self.test_rx_no_response(*value);
+        }
+    }
 }
 
 #[test]
