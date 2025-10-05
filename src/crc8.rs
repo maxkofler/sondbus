@@ -1,3 +1,5 @@
+use crate::test_log;
+
 /// The initial value for the CRC calculation
 pub const CRC8_AUTOSAR_INIT: u8 = 0xff;
 /// The polynomial for computing the CRC checksum
@@ -85,6 +87,8 @@ impl CRC<u8> for CRC8Autosar {
     }
 
     fn update_single(&mut self, t: u8) {
+        #[cfg(test)]
+        let old = self.crc;
         self.crc ^= t;
         for _ in 0..8 {
             if self.crc & 0x80 != 0 {
@@ -93,6 +97,7 @@ impl CRC<u8> for CRC8Autosar {
                 self.crc <<= 1;
             }
         }
+        test_log!("Updated CRC from 0x{old:x} -> 0x{:x} by 0x{t:x}", self.crc);
     }
 
     fn finalize(&self) -> u8 {

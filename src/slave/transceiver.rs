@@ -2,76 +2,83 @@
 //! and handles synchronization of the communication and memory access.
 
 mod command;
+mod state;
 
 #[cfg(test)]
 mod test;
 
 use crate::{
     crc8::{CRC8Autosar, CRC},
-    SYNC_SEQUENCE,
+    slave::transceiver::state::State,
+    test_log,
 };
 use command::Command;
 
 type StateFunction = fn(&mut Transceiver, rx: Option<u8>) -> Option<u8>;
 
-/// Enumerates the state functions that the control flow
-/// jumps to for the individual states.
-///
-/// Make sure that the order is EXACTLY the same as in [State]
-const STATES: [StateFunction; 4] = [
-    state_wait_for_start,
-    state_wait_for_cmd,
-    state_sync,
-    state_wait_for_crc,
-];
+/// Consequences of commands that are executed if a
+/// command is finished with the right CRC
+#[derive(PartialEq, Debug)]
+enum Consequence {
+    /// Nothing, return back to idle
+    None,
 
-/// Enumerates the possible states the [Transceiver] can be in
-///
-/// Make sure that the order is EXACTLY the same as in [STATES]
-#[repr(usize)]
-#[derive(Clone, PartialEq, Debug)]
-enum State {
-    WaitForStart = 0,
-    WaitForCommand,
-    Sync,
-    WaitForCRC,
+    GainSync,
+
+    /// Write the contents of the scratchpad to the
+    /// slave's memory area
+    WriteScratchpad,
 }
 
 /// Represents a transceiver in the sondbus model.
 ///
 /// The transceiver implements the lowest layer of the sondbus communication protocol
 /// and handles synchronization of the communication and slave memory access.
-pub struct Transceiver {
+pub struct Transceiver<'a> {
     state: State,
     crc: CRC8Autosar,
     cur_cmd: Command,
+
     in_sync: bool,
+    sequence_no: u8,
 
     pos: u16,
+
+    mem_cmd_addr: [u8; 6],
+    mem_cmd_offset: u16,
+    mem_cmd_size: u16,
 
     physical_address: [u8; 6],
     logical_address: [u8; 2],
 
-    scratchpad: &'static mut [u8],
+    scratchpad: &'a mut [u8],
+    consequence: Consequence,
 }
 
-impl Transceiver {
+impl<'a> Transceiver<'a> {
     /// Creates a new transceiver
     /// # Arguments
     /// * `scratchpad` - The scratchpad memory to operate on
-    pub const fn new(scratchpad: &'static mut [u8], physical_address: [u8; 6]) -> Self {
+    pub const fn new(scratchpad: &'a mut [u8], physical_address: [u8; 6]) -> Self {
         Self {
             state: State::WaitForStart,
             crc: CRC8Autosar::new_const(),
             cur_cmd: Command::new(0),
+
             in_sync: false,
+            sequence_no: 0,
 
             pos: 0,
+            mem_cmd_addr: [0u8; 6],
+            mem_cmd_offset: 0,
+            mem_cmd_size: 0,
 
             physical_address,
             logical_address: [0u8; 2],
 
             scratchpad,
+
+            consequence: Consequence::None,
         }
     }
 
@@ -79,6 +86,7 @@ impl Transceiver {
     /// taking the transceiver offline until the next `Sync`
     /// command comes around from the master
     pub fn loose_sync(&mut self) {
+        test_log!("Lost sync!");
         self.in_sync = false;
     }
 
@@ -87,13 +95,14 @@ impl Transceiver {
     /// * `rx` - An incoming byte from the physical layer
     /// # Returns
     /// A byte to be sent via the physical layer, if any
+    #[allow(clippy::let_and_return)] // This is to remove a warning around test_log!()
     pub fn handle(&mut self, rx: Option<u8>) -> Option<u8> {
-        let state = self.state.clone() as usize;
-        let res = STATES[state](self, rx);
+        #[cfg(test)]
+        let old_state = self.state.clone();
 
-        if let Some(rx) = rx {
-            self.crc.update_single(rx);
-        }
+        let res = state::handle(self, rx);
+
+        test_log!("Transitioned from {:?} to {:?}", old_state, self.state);
 
         res
     }
@@ -107,81 +116,13 @@ impl Transceiver {
 
         match self.cur_cmd.mem_slave_address_len() {
             0 => true,
-            2 => &self.mem_cmd_addr[0..2] == self.logical_address,
+            2 => self.mem_cmd_addr[0..2] == self.logical_address,
             6 => self.mem_cmd_addr == self.physical_address,
             _ => false,
         }
     }
-}
 
-fn state_wait_for_start(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
-    if let Some(rx) = rx {
-        if rx == 0x55 {
-            ctx.state = State::WaitForCommand;
-            ctx.crc = CRC8Autosar::new_const();
-        }
+    fn update_crc(&mut self, v: u8) {
+        self.crc.update_single(v)
     }
-
-    None
-}
-
-fn state_wait_for_cmd(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
-    if let Some(rx) = rx {
-        ctx.cur_cmd = Command::new(rx);
-
-        if ctx.cur_cmd.is_mgt_cmd() {
-            match ctx.cur_cmd.mgt_get_cmd() {
-                // 0x00 is a NOP command, so we immediately wait for the CRC
-                0x00 => {
-                    ctx.state = State::WaitForCRC;
-                }
-                // 0x01 is the SYNC command, pass to the SYNC state
-                0x01 => {
-                    ctx.state = State::Sync;
-                    ctx.pos = 0;
-                }
-                _ => {
-                    ctx.loose_sync();
-                    ctx.state = State::WaitForStart;
-                }
-            }
-        }
-    }
-
-    None
-}
-
-fn state_sync(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
-    if let Some(rx) = rx {
-        if ctx.pos <= 14 {
-            if rx != SYNC_SEQUENCE[ctx.pos as usize] {
-                ctx.loose_sync();
-                ctx.state = State::WaitForStart;
-            }
-        } else if ctx.pos >= 15 {
-            let version = rx;
-            if version != 1 {
-                ctx.loose_sync();
-            } else {
-                ctx.in_sync = true;
-            }
-            ctx.state = State::WaitForCRC;
-        }
-
-        ctx.pos += 1;
-    }
-
-    None
-}
-
-fn state_wait_for_crc(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
-    if let Some(rx) = rx {
-        ctx.state = State::WaitForStart;
-
-        if rx != ctx.crc.finalize() {
-            ctx.loose_sync();
-        }
-    }
-
-    None
 }
