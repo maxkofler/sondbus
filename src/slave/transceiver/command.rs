@@ -1,3 +1,5 @@
+pub mod memory;
+
 pub struct Command {
     value: u8,
 }

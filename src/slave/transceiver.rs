@@ -8,6 +8,7 @@ mod test;
 
 use crate::{
     crc8::{CRC8Autosar, CRC},
+    slave::transceiver::command::memory::*,
     SYNC_SEQUENCE,
 };
 use command::Command;
@@ -18,10 +19,17 @@ type StateFunction = fn(&mut Transceiver, rx: Option<u8>) -> Option<u8>;
 /// jumps to for the individual states.
 ///
 /// Make sure that the order is EXACTLY the same as in [State]
-const STATES: [StateFunction; 4] = [
+const STATES: [StateFunction; 11] = [
     state_wait_for_start,
     state_wait_for_cmd,
     state_sync,
+    state_mem_address,
+    state_mem_offset,
+    state_mem_size,
+    state_mem_header_crc,
+    state_mem_payload,
+    state_mem_crc,
+    state_mem_ack_crc,
     state_wait_for_crc,
 ];
 
@@ -34,6 +42,13 @@ enum State {
     WaitForStart = 0,
     WaitForCommand,
     Sync,
+    MEMAddress,
+    MEMOffset,
+    MEMSize,
+    MEMHeaderCRC,
+    MEMPayload,
+    MEMCrc,
+    MEMAckCRC,
     WaitForCRC,
 }
 
