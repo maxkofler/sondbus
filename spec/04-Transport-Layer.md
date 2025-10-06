@@ -49,8 +49,8 @@ These bits are specific to the command set that is selected by the [Command Set 
 
 This bit selects between the two available command sets:
 
-- `true` => [Memory Command Set](#32-memory-command-set)
 - `false` => [Management Command Set](#33---management-command-set)
+- `true` => [Memory Command Set](#32-memory-command-set)
 
 ### 3.1.3 - Sequence Number
 
@@ -72,17 +72,16 @@ The 5 command set specific bits are explained in the following table:
 
 A frame using the Memory Command Set has the following general structure:
 
-| Length in Octets |     Source     |                    Description                    |
-| :--------------: | :------------: | :-----------------------------------------------: |
-|        1         |     Master     |                       Start                       |
-|        1         |     Master     |             [Command](#321---command)             |
-|    0 / 2 / 6     |     Master     |       [Slave Address](#322---slave-address)       |
-|      1 / 2       |     Master     |              [Offset](#323---offset)              |
-|      1 / 2       |     Master     |                [Size](#324---size)                |
-|        1         |     Master     |          [Header CRC](#325---header-crc)          |
-|        n         | Master / Slave |             [Payload](#326---payload)             |
-|        1         | Master / Slave |                 [CRC](#327---crc)                 |
-|        1         |     Slave      | [Acknowledgement CRC](#328---acknowledgement-crc) |
+| Length in Octets |     Source     |              Description              |
+| :--------------: | :------------: | :-----------------------------------: |
+|        1         |     Master     |                 Start                 |
+|        1         |     Master     |       [Command](#321---command)       |
+|    0 / 2 / 6     |     Master     | [Slave Address](#322---slave-address) |
+|      1 / 2       |     Master     |        [Offset](#323---offset)        |
+|      1 / 2       |     Master     |          [Size](#324---size)          |
+|      0 / 1       |     Master     |    [Header CRC](#325---header-crc)    |
+|        n         | Master / Slave |       [Payload](#326---payload)       |
+|        1         | Master / Slave |           [CRC](#327---crc)           |
 
 ### 3.2.1 - Command
 
@@ -153,6 +152,8 @@ The 16-bit addressing mode is optional to each slave and can be supported in 2 w
 The `Header CRC` field contains a CRC of the frame contents up to this point.
 It confirms the contents of the header to the slave to inform it on whether it can trust the submitted data or not.
 
+This field is only active for `read` commands.
+
 ### 3.2.6 - Payload
 
 The `Data` field contains the payload data.
@@ -169,11 +170,6 @@ Depending on the `Operation` bit in the `Command`, this field is sent by:
 
 - `false` => Slave
 - `true` => Master
-
-### 3.2.8 - Acknowledgement CRC
-
-This field is an acknowledgement to the write operation by the master.
-It only applies to non-broadcast write operations and contains all the fields of the write command including the CRC sent by the master.
 
 ## 3.3 - Management Command Set
 
