@@ -23,7 +23,3 @@ pub fn state_mem_payload(transceiver: &mut Transceiver, rx: Option<u8>) -> Optio
 pub fn state_mem_crc(transceiver: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     None
 }
-
-pub fn state_mem_ack_crc(transceiver: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
-    None
-}

@@ -19,7 +19,7 @@ type StateFunction = fn(&mut Transceiver, rx: Option<u8>) -> Option<u8>;
 /// jumps to for the individual states.
 ///
 /// Make sure that the order is EXACTLY the same as in [State]
-const STATES: [StateFunction; 11] = [
+const STATES: [StateFunction; 10] = [
     state_wait_for_start,
     state_wait_for_cmd,
     state_sync,
@@ -29,7 +29,6 @@ const STATES: [StateFunction; 11] = [
     state_mem_header_crc,
     state_mem_payload,
     state_mem_crc,
-    state_mem_ack_crc,
     state_wait_for_crc,
 ];
 
@@ -48,7 +47,6 @@ enum State {
     MEMHeaderCRC,
     MEMPayload,
     MEMCrc,
-    MEMAckCRC,
     WaitForCRC,
 }
 
@@ -138,6 +136,13 @@ fn state_wait_for_cmd(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
                     ctx.loose_sync();
                     ctx.state = State::WaitForStart;
                 }
+            }
+        } else {
+            if ctx.cur_cmd.mem_slave_address_len() == 0 {
+                ctx.pos = 0;
+                ctx.state = State::MEMOffset;
+            } else {
+                ctx.state = State::MEMAddress;
             }
         }
     }
