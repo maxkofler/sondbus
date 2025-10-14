@@ -180,6 +180,7 @@ The following commands are specified:
 
 - `0x00`: [NOP](#331---nop)
 - `0x01`: [Sync](#332---sync)
+- `0x02`: [Reset](#333---reset)
 
 ### 3.3.1 - NOP
 
@@ -220,6 +221,13 @@ Currently, there is only one value for this field:
 - `0x01`: Version 1.0.0 of the sondbus protocol.
 
 All other values may be treated as invalid and shall fail synchronization.
+
+### 3.3.3 - Reset
+
+This command can reset the slave configuration of the memory area and its mappings to boot state.
+This allows a master to pick up slaves from any state and start with a clean configuration.
+
+This commands has no payload and is essentially a NOP on the bus with the exception of resetting all slaves to their initial states.
 
 # 4 - Optional Features
 
