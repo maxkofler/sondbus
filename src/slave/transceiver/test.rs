@@ -6,10 +6,10 @@ use crate::{
 
 mod mem_cmd;
 
-static SCRATCHPAD: [u8; 0xF] = [0u8; 0xF];
+static mut SCRATCHPAD: [u8; 0xF] = [0u8; 0xF];
 
 pub fn new_transceiver() -> Transceiver {
-    Transceiver::new(&SCRATCHPAD)
+    Transceiver::new(unsafe { &mut SCRATCHPAD }, [0u8; 6])
 }
 
 impl Transceiver {
@@ -22,6 +22,14 @@ impl Transceiver {
         for value in values {
             self.test_rx_no_response(*value);
         }
+    }
+
+    fn test_state(&self, state: State) {
+        assert_eq!(
+            state, self.state,
+            "Transceiver is in wrong state: expected '{:?}', got '{:?}'",
+            state, self.state
+        )
     }
 }
 

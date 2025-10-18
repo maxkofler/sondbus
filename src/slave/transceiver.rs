@@ -28,7 +28,7 @@ const STATES: [StateFunction; 10] = [
     state_mem_size,
     state_mem_header_crc,
     state_mem_payload,
-    state_mem_crc,
+    state_send_crc,
     state_wait_for_crc,
 ];
 
@@ -46,8 +46,20 @@ enum State {
     MEMSize,
     MEMHeaderCRC,
     MEMPayload,
-    MEMCrc,
+    SendCRC,
     WaitForCRC,
+}
+
+/// Consequences of commands that are executed if a
+/// command is finished with the right CRC
+#[derive(PartialEq, Debug)]
+enum Consequence {
+    /// Nothing, return back to idle
+    None,
+
+    /// Write the contents of the scratchpad to the
+    /// slave's memory area
+    WriteScratchpad,
 }
 
 /// Represents a transceiver in the sondbus model.
@@ -61,15 +73,23 @@ pub struct Transceiver {
     in_sync: bool,
 
     pos: u16,
+    mem_cmd_addr: [u8; 6],
+    mem_cmd_offset: u16,
+    mem_cmd_size: u16,
 
-    scratchpad: &'static [u8],
+    physical_address: [u8; 6],
+    logical_address: [u8; 2],
+
+    scratchpad: &'static mut [u8],
+
+    consequence: Consequence,
 }
 
 impl Transceiver {
     /// Creates a new transceiver
     /// # Arguments
     /// * `scratchpad` - The scratchpad memory to operate on
-    pub const fn new(scratchpad: &'static [u8]) -> Self {
+    pub const fn new(scratchpad: &'static mut [u8], physical_address: [u8; 6]) -> Self {
         Self {
             state: State::WaitForStart,
             crc: CRC8Autosar::new_const(),
@@ -77,8 +97,16 @@ impl Transceiver {
             in_sync: false,
 
             pos: 0,
+            mem_cmd_addr: [0u8; 6],
+            mem_cmd_offset: 0,
+            mem_cmd_size: 0,
+
+            physical_address,
+            logical_address: [0u8; 2],
 
             scratchpad,
+
+            consequence: Consequence::None,
         }
     }
 
@@ -99,7 +127,12 @@ impl Transceiver {
         let res = STATES[state](self, rx);
 
         if let Some(rx) = rx {
+            let old_crc = self.crc.finalize();
             self.crc.update_single(rx);
+            println!(
+                "RX {rx:x}, old CRC={old_crc:x}, new={:x}",
+                self.crc.finalize()
+            );
         }
 
         res
@@ -110,6 +143,7 @@ fn state_wait_for_start(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         if rx == 0x55 {
             ctx.state = State::WaitForCommand;
+            ctx.consequence = Consequence::None;
             ctx.crc = CRC8Autosar::new_const();
         }
     }
@@ -120,6 +154,7 @@ fn state_wait_for_start(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
 fn state_wait_for_cmd(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         ctx.cur_cmd = Command::new(rx);
+        ctx.pos = 0;
 
         if ctx.cur_cmd.is_mgt_cmd() {
             match ctx.cur_cmd.mgt_get_cmd() {
@@ -139,7 +174,6 @@ fn state_wait_for_cmd(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
             }
         } else {
             if ctx.cur_cmd.mem_slave_address_len() == 0 {
-                ctx.pos = 0;
                 ctx.state = State::MEMOffset;
             } else {
                 ctx.state = State::MEMAddress;
@@ -171,6 +205,10 @@ fn state_sync(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     }
 
     None
+}
+
+fn state_send_crc(t: &mut Transceiver, _rx: Option<u8>) -> Option<u8> {
+    Some(t.crc.finalize())
 }
 
 fn state_wait_for_crc(ctx: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
