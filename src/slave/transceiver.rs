@@ -49,14 +49,14 @@ pub struct Transceiver {
 
     pos: u16,
 
-    scratchpad: &'static [u8],
+    scratchpad: &'static mut [u8],
 }
 
 impl Transceiver {
     /// Creates a new transceiver
     /// # Arguments
     /// * `scratchpad` - The scratchpad memory to operate on
-    pub const fn new(scratchpad: &'static [u8]) -> Self {
+    pub const fn new(scratchpad: &'static mut [u8], physical_address: [u8; 6]) -> Self {
         Self {
             state: State::WaitForStart,
             crc: CRC8Autosar::new_const(),
