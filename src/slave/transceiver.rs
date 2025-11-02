@@ -49,6 +49,9 @@ pub struct Transceiver {
 
     pos: u16,
 
+    physical_address: [u8; 6],
+    logical_address: [u8; 2],
+
     scratchpad: &'static mut [u8],
 }
 
@@ -64,6 +67,9 @@ impl Transceiver {
             in_sync: false,
 
             pos: 0,
+
+            physical_address,
+            logical_address: [0u8; 2],
 
             scratchpad,
         }
@@ -90,6 +96,21 @@ impl Transceiver {
         }
 
         res
+    }
+
+    /// Returns whether the data that is coming up to this point
+    /// is targeted to us or another slave
+    fn is_targeted(&self) -> bool {
+        if !self.cur_cmd.is_mem_cmd() {
+            return false;
+        }
+
+        match self.cur_cmd.mem_slave_address_len() {
+            0 => true,
+            2 => &self.mem_cmd_addr[0..2] == self.logical_address,
+            6 => self.mem_cmd_addr == self.physical_address,
+            _ => false,
+        }
     }
 }
 
