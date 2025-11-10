@@ -6,15 +6,7 @@ use crate::{
 pub fn state_wait_for_crc(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         t.state = if t.crc.finalize() == rx {
-            // TODO: Handle the consequence
-
-            match t.consequence {
-                Consequence::GainSync => {
-                    t.in_sync = true;
-                    t.sequence_no = (t.cur_cmd.raw() >> 6) & 0b11;
-                }
-                _ => {}
-            }
+            handle_consequence(t);
 
             State::WaitForStart
         } else {
@@ -26,4 +18,24 @@ pub fn state_wait_for_crc(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     }
 
     None
+}
+
+fn handle_consequence(t: &mut Transceiver) {
+    match t.consequence {
+        // No consequence, just do nothing
+        Consequence::None => {}
+
+        // Gain sync, latch the sequence number of the
+        // sync command into the internal sync register
+        // and go into the synchronized state
+        Consequence::GainSync => {
+            t.in_sync = true;
+            t.sequence_no = (t.cur_cmd.raw() >> 6) & 0b11;
+        }
+
+        // Write the contents of the scratchpad to memory
+        Consequence::WriteScratchpad => {
+            // TODO: Handle the scratchpad write command
+        }
+    }
 }
