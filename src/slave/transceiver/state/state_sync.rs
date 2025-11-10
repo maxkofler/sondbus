@@ -1,6 +1,6 @@
 use crate::{
     slave::transceiver::{state::State, Consequence, Transceiver},
-    test_log, SYNC_SEQUENCE,
+    test_log, PROTOCOL_VERSION_1, SYNC_SEQUENCE,
 };
 
 pub fn state_sync(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
@@ -15,7 +15,7 @@ pub fn state_sync(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
             }
         } else if t.pos >= 15 {
             let version = rx;
-            if version != 1 {
+            if version != PROTOCOL_VERSION_1 {
                 t.loose_sync();
             } else {
                 t.consequence = Consequence::GainSync;

@@ -1,4 +1,7 @@
-use crate::slave::transceiver::{command::Command, state::State, Transceiver};
+use crate::{
+    slave::transceiver::{command::Command, state::State, Transceiver},
+    CMD_NOP, CMD_SYNC,
+};
 
 const MASK_CMD_COMMAND: u8 = 0b11_1111;
 const MASK_CMD_SEQUENCE: u8 = 0b1100_0000;
@@ -28,9 +31,14 @@ pub fn state_wait_for_cmd(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
 
         // Match on the command to determine which state to transition to.
         match cmd {
-            0x00 => t.state = State::WaitForCRC,
-            0x01 => t.state = State::Sync,
-            _ => {}
+            CMD_NOP => t.state = State::WaitForCRC,
+            CMD_SYNC => t.state = State::Sync,
+            _ => {
+                // An unknown command has been received.
+                // In that case, we loose sync and go back to idle
+                t.loose_sync();
+                t.state = State::WaitForStart
+            }
         }
     }
 
