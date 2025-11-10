@@ -1,5 +1,7 @@
 use crate::slave::transceiver::{StateFunction, Transceiver};
 
+mod state_mem_address;
+mod state_mem_offset;
 mod state_sync;
 mod state_wait_for_cmd;
 mod state_wait_for_crc;
@@ -9,13 +11,13 @@ mod state_wait_for_start;
 /// jumps to for the individual states.
 ///
 /// Make sure that the order is EXACTLY the same as in [State]
-const STATES: [StateFunction; 4] = [
+const STATES: [StateFunction; 6] = [
     state_wait_for_start::state_wait_for_start,
     state_wait_for_cmd::state_wait_for_cmd,
     state_sync::state_sync,
-    /*state_mem_address,
-    state_mem_offset,
-    state_mem_size,
+    state_mem_address::state_mem_address,
+    state_mem_offset::state_mem_offset,
+    /*state_mem_size,
     state_mem_header_crc,
     state_mem_rx_payload,
     state_mem_tx_payload,
@@ -32,9 +34,9 @@ pub enum State {
     WaitForStart = 0,
     WaitForCommand,
     Sync,
-    /*MEMAddress,
+    MEMAddress,
     MEMOffset,
-    MEMSize,
+    /*MEMSize,
     MEMHeaderCRC,
     MEMRxPayload,
     MEMTxPayload,

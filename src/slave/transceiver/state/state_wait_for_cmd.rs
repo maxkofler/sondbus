@@ -1,5 +1,9 @@
 use crate::{
-    slave::transceiver::{command::Command, state::State, Transceiver},
+    slave::transceiver::{
+        command::{AddressingMode, Command},
+        state::State,
+        Transceiver,
+    },
     CMD_NOP, CMD_SYNC,
 };
 
@@ -33,6 +37,9 @@ pub fn state_wait_for_cmd(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
         match cmd {
             CMD_NOP => t.state = State::WaitForCRC,
             CMD_SYNC => t.state = State::Sync,
+            0b1_00000..0b1_11111 => {
+                handle_mem_cmd(t);
+            }
             _ => {
                 // An unknown command has been received.
                 // In that case, we loose sync and go back to idle
@@ -43,4 +50,13 @@ pub fn state_wait_for_cmd(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     }
 
     None
+}
+
+fn handle_mem_cmd(t: &mut Transceiver) {
+    match t.cur_cmd.mem_slave_addressing_mode() {
+        AddressingMode::Broadcast | AddressingMode::None => {
+            t.state = State::MEMOffset;
+        }
+        AddressingMode::Physical | AddressingMode::Logical => t.state = State::MEMAddress,
+    }
 }

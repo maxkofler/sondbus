@@ -1,7 +1,16 @@
+use core::hint::unreachable_unchecked;
+
 pub mod memory;
 
 pub struct Command {
     value: u8,
+}
+
+pub enum AddressingMode {
+    Broadcast,
+    Physical,
+    Logical,
+    None,
 }
 
 impl Command {
@@ -11,6 +20,16 @@ impl Command {
 
     pub fn raw(&self) -> u8 {
         self.value
+    }
+
+    pub fn mem_slave_addressing_mode(&self) -> AddressingMode {
+        match (self.value & 0b100) >> 1 {
+            0b00 => AddressingMode::Broadcast,
+            0b01 => AddressingMode::Physical,
+            0b10 => AddressingMode::Logical,
+            0b11 => AddressingMode::None,
+            _ => unreachable!("Addressing mode should not exceed 3"),
+        }
     }
 
     pub fn is_mem_cmd(&self) -> bool {

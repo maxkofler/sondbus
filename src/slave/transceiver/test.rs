@@ -1,6 +1,7 @@
 use crate::slave::transceiver::state::State;
 
 //mod mem_cmd;
+mod t_cmd_mem_broadcast;
 mod t_cmd_nop;
 mod t_cmd_sync;
 mod t_sequence;
@@ -15,6 +16,13 @@ macro_rules! test_state {
             $s,
             &$t.state
         )
+    };
+}
+
+/// Test that the supplied transceiver is in the correct state
+macro_rules! test_sync {
+    ($t:expr, $s:expr) => {
+        assert_eq!($t.in_sync, $s, "Expected sync {}, got {}", $s, &$t.in_sync)
     };
 }
 
@@ -46,7 +54,7 @@ macro_rules! test_rx_crc_no_response {
 }
 
 pub(crate) use {
-    new_transceiver_in_sync, test_rx_crc_no_response, test_rx_no_response, test_state,
+    new_transceiver_in_sync, test_rx_crc_no_response, test_rx_no_response, test_state, test_sync,
 };
 
 #[test]
