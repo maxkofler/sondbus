@@ -82,6 +82,11 @@ impl<'a> Transceiver<'a> {
         }
     }
 
+    /// Returns whether the bus is in sync or not
+    pub fn in_sync(&self) -> bool {
+        self.in_sync
+    }
+
     /// Sets the internal `in_sync` flag false, effectively
     /// taking the transceiver offline until the next `Sync`
     /// command comes around from the master
