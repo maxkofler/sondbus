@@ -1,6 +1,6 @@
 use crate::{
     crc8::CRC,
-    slave::transceiver::{state::State, Consequence, Transceiver},
+    slave::transceiver::{state::State, CallbackAction, Consequence, Transceiver},
 };
 
 pub fn state_wait_for_crc(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
@@ -14,7 +14,7 @@ pub fn state_wait_for_crc(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
             // with the bus and go back to idle
             t.loose_sync();
             State::WaitForStart
-        }
+        };
     }
 
     None
@@ -35,7 +35,18 @@ fn handle_consequence(t: &mut Transceiver) {
 
         // Write the contents of the scratchpad to memory
         Consequence::WriteScratchpad => {
-            // TODO: Handle the scratchpad write command
+            let res = (t.callback)(CallbackAction::WriteMemory {
+                offset: t.mem_cmd_offset,
+                data: &mut t.scratchpad[0..t.mem_cmd_size as usize],
+            });
+
+            // If the callback was not successful
+            // we loose sync with the bus, as an
+            // illegal operation took place
+            if res.is_err() {
+                t.loose_sync();
+                t.state = State::WaitForStart;
+            }
         }
     }
 }

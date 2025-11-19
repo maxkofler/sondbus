@@ -1,4 +1,4 @@
-use crate::slave::transceiver::state::State;
+use crate::slave::transceiver::{state::State, CallbackAction};
 
 //mod mem_cmd;
 mod t_cmd_mem_addressed;
@@ -53,6 +53,10 @@ macro_rules! test_tx {
     };
 }
 
+fn empty_callback(_action: CallbackAction) -> Result<(), ()> {
+    Ok(())
+}
+
 /// Create a new transceiver instance that
 /// is already initialized and in sync
 macro_rules! new_transceiver_in_sync {
@@ -61,7 +65,11 @@ macro_rules! new_transceiver_in_sync {
     };
     ($t: ident, $addr: expr) => {
         let mut scratchpad = [0u8; 0xf];
-        let mut $t = crate::slave::transceiver::Transceiver::new(&mut scratchpad, $addr);
+        let mut $t = crate::slave::transceiver::Transceiver::new(
+            &mut scratchpad,
+            $addr,
+            crate::slave::transceiver::test::empty_callback,
+        );
         $t.in_sync = true;
         $t.sequence_no = 0b11;
     };

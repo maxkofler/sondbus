@@ -1,12 +1,25 @@
 use crate::{
     crc8::CRC,
-    slave::transceiver::{state::State, Transceiver},
+    slave::transceiver::{state::State, CallbackAction, Transceiver},
 };
 
 pub fn state_mem_header_crc(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         if t.crc.finalize() == rx {
-            // TODO: Call the host to read the data
+            // Call the application to fill the buffer for us
+            let res = (t.callback)(CallbackAction::ReadMemory {
+                offset: t.mem_cmd_offset,
+                data: &mut t.scratchpad[0..(t.mem_cmd_size as usize)],
+            });
+
+            // Check the return code. If it is not ok,
+            // we loose sync with the bus, as an illegal
+            // operation was performed
+            if res.is_err() {
+                t.loose_sync();
+                t.state = State::WaitForStart;
+                return None;
+            }
 
             t.update_crc(rx);
             t.pos = 0;
@@ -23,6 +36,7 @@ pub fn state_mem_header_crc(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
             t.state = State::WaitForStart;
         }
     }
+
     None
 }
 

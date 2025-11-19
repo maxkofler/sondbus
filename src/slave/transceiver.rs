@@ -30,6 +30,19 @@ enum Consequence {
     WriteScratchpad,
 }
 
+/// The possible actions that can be requested
+/// when the callback is called
+pub enum CallbackAction<'a> {
+    /// Write the contents of `data` to memory at `offset`
+    WriteMemory { offset: u16, data: &'a [u8] },
+
+    ///  Read from memory memory at `offset` to `data`
+    ReadMemory { offset: u16, data: &'a mut [u8] },
+}
+
+/// A type alias for the callback
+pub type Callback = for<'a> fn(CallbackAction<'a>) -> Result<(), ()>;
+
 /// Represents a transceiver in the sondbus model.
 ///
 /// The transceiver implements the lowest layer of the sondbus communication protocol
@@ -53,13 +66,21 @@ pub struct Transceiver<'a> {
 
     scratchpad: &'a mut [u8],
     consequence: Consequence,
+
+    callback: Callback,
 }
 
 impl<'a> Transceiver<'a> {
     /// Creates a new transceiver
     /// # Arguments
     /// * `scratchpad` - The scratchpad memory to operate on
-    pub const fn new(scratchpad: &'a mut [u8], physical_address: [u8; 6]) -> Self {
+    /// * `physical_address` - The unique physical address of the transceiver
+    /// * `callback` - A callback function for the transceiver to call into the application
+    pub const fn new(
+        scratchpad: &'a mut [u8],
+        physical_address: [u8; 6],
+        callback: Callback,
+    ) -> Self {
         Self {
             state: State::WaitForStart,
             crc: CRC8Autosar::new_const(),
@@ -79,6 +100,7 @@ impl<'a> Transceiver<'a> {
             scratchpad,
 
             consequence: Consequence::None,
+            callback,
         }
     }
 
