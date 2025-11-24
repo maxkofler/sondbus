@@ -53,6 +53,13 @@ pub struct Transceiver<'a> {
     cur_cmd: Command,
 
     in_sync: bool,
+
+    /// The activity flag gets set to true if a valid frame
+    /// or frame header has been received, indicating valid
+    /// activity on the bus. It can be set to false by the
+    /// consumer of the transceiver to detect timeouts.
+    activity_flag: bool,
+
     sequence_no: u8,
 
     pos: u16,
@@ -87,6 +94,7 @@ impl<'a> Transceiver<'a> {
             cur_cmd: Command::new(0),
 
             in_sync: false,
+            activity_flag: false,
             sequence_no: 0,
 
             pos: 0,
@@ -115,6 +123,22 @@ impl<'a> Transceiver<'a> {
     pub fn loose_sync(&mut self) {
         test_log!("Lost sync!");
         self.in_sync = false;
+    }
+
+    /// Returns the current state of the activity flag,
+    /// indicating that there was valid RX activity on the
+    /// bus since the last [clear](Self::clear_activity_flag) of this flag
+    pub fn get_activity_flag(&self) -> bool {
+        self.activity_flag
+    }
+
+    /// Clears the activity flag, re-arming it to detect new
+    /// bus activity. Returns the last state of the flag before
+    /// it has been cleared
+    pub fn clear_activity_flag(&mut self) -> bool {
+        let old = self.activity_flag;
+        self.activity_flag = false;
+        old
     }
 
     /// Process some event in the state machine of the transceiver.

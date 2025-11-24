@@ -6,6 +6,8 @@ use crate::{
 pub fn state_mem_header_crc(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         if t.crc.finalize() == rx {
+            t.activity_flag = true;
+
             // Call the application to fill the buffer for us
             let res = (t.callback)(CallbackAction::ReadMemory {
                 offset: t.mem_cmd_offset,

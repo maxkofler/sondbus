@@ -6,6 +6,7 @@ use crate::{
 pub fn state_wait_for_crc(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
         t.state = if t.crc.finalize() == rx {
+            t.activity_flag = true;
             handle_consequence(t);
 
             State::WaitForStart
