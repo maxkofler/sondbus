@@ -11,7 +11,7 @@
 #show heading.where(level: 2): set text(size: 25pt)
 
 #set text(
-  size: 14pt,
+  size: 12pt,
 )
 
 #set heading(
