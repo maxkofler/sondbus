@@ -7,6 +7,8 @@ const MASK_SEQUENCE: u8 = 0b1100_0000;
 
 pub fn state_idle(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
+        t.pos = 0;
+
         t.update_crc(rx);
 
         // Unpack the command and sequence from the received byte
@@ -39,7 +41,7 @@ pub fn state_idle(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
         let state = match command {
             Command::Management(c) => match c {
                 ManagementCommand::Nop => State::CRC,
-                _ => State::Idle,
+                ManagementCommand::Sync => State::ManagementSync,
             },
             _ => State::Idle,
         };

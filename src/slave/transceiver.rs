@@ -10,6 +10,16 @@ use state::State;
 
 use crate::test_log;
 
+/// Consequences of commands that are executed if a
+/// command is finished with the right CRC
+#[derive(PartialEq, Debug)]
+enum Consequence {
+    /// Nothing, return back to idle
+    None,
+
+    GainSync,
+}
+
 type StateFunction = fn(&mut Transceiver, rx: Option<u8>) -> Option<u8>;
 
 /// The possible actions that can be requested
@@ -49,6 +59,11 @@ pub struct Transceiver<'a> {
     /// The scratchpad memory used to temporarily store incoming data
     /// before it is committed using the callback
     scratchpad: &'a mut [u8],
+
+    /// The current position in a buffer
+    pos: u8,
+
+    consequence: Consequence,
 }
 
 impl<'a> Transceiver<'a> {
@@ -69,6 +84,8 @@ impl<'a> Transceiver<'a> {
             in_sync: false,
             sequence_no: 0,
             scratchpad,
+            pos: 0,
+            consequence: Consequence::None,
         }
     }
 
@@ -106,3 +123,22 @@ impl<'a> Transceiver<'a> {
         self.crc.update_single(v)
     }
 }
+
+#[cfg(test)]
+impl<'a> Transceiver<'a> {
+    pub fn t_handle_no_response(&mut self, rx: u8) {
+        let old_state = self.state.clone();
+        let res = self.handle(Some(rx));
+        assert!(
+            res.is_none(),
+            "Handling {rx:x} in state {old_state:?} responded when it should not"
+        );
+    }
+
+    pub fn t_handle_crc(&mut self) {
+        self.t_handle_no_response(self.crc.finalize());
+    }
+}
+
+#[cfg(test)]
+mod test;
