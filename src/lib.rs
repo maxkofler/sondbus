@@ -1,6 +1,7 @@
 #![cfg_attr(not(test), no_std)]
 
 pub mod crc8;
+pub mod model;
 pub mod slave;
 
 /// The byte sequence of the `SYNC` command

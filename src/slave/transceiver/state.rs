@@ -1,34 +1,12 @@
 use crate::slave::transceiver::{StateFunction, Transceiver};
 
-mod state_mem_address;
-mod state_mem_header_crc;
-mod state_mem_offset;
-mod state_mem_rx_payload;
-mod state_mem_size;
-mod state_mem_tx_payload;
-mod state_send_crc;
-mod state_sync;
-mod state_wait_for_cmd;
-mod state_wait_for_crc;
-mod state_wait_for_start;
+mod s_00_idle;
 
 /// Enumerates the state functions that the control flow
 /// jumps to for the individual states.
 ///
 /// Make sure that the order is EXACTLY the same as in [State]
-const STATES: [StateFunction; 11] = [
-    state_wait_for_start::state_wait_for_start,
-    state_wait_for_cmd::state_wait_for_cmd,
-    state_sync::state_sync,
-    state_mem_address::state_mem_address,
-    state_mem_offset::state_mem_offset,
-    state_mem_size::state_mem_size,
-    state_mem_rx_payload::state_mem_rx_payload,
-    state_mem_header_crc::state_mem_header_crc,
-    state_mem_tx_payload::state_mem_tx_payload,
-    state_send_crc::state_send_crc,
-    state_wait_for_crc::state_wait_for_crc,
-];
+const STATES: [StateFunction; 1] = [s_00_idle::state_idle];
 
 /// Enumerates the possible states the [Transceiver] can be in
 ///
@@ -36,17 +14,14 @@ const STATES: [StateFunction; 11] = [
 #[repr(usize)]
 #[derive(Clone, PartialEq, Debug)]
 pub enum State {
-    WaitForStart = 0,
-    WaitForCommand,
-    Sync,
-    MEMAddress,
-    MEMOffset,
-    MEMSize,
-    MEMRxPayload,
-    MEMHeaderCRC,
-    MEMTxPayload,
-    SendCRC,
-    WaitForCRC,
+    /// The idle state of the transceiver that waits for a command
+    /// to be received
+    Idle,
+
+    /// The transceiver waits for the closing CRC
+    CRC,
+
+    ManagementSync,
 }
 
 pub fn handle(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
