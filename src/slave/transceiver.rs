@@ -17,19 +17,24 @@ enum Consequence {
     /// Nothing, return back to idle
     None,
 
+    /// Gain sync at the end of the message
     GainSync,
+
+    /// Write the contents of the scratchpad to memory
+    WriteScratchpad,
 }
 
 type StateFunction = fn(&mut Transceiver, rx: Option<u8>) -> Option<u8>;
 
 /// The possible actions that can be requested
 /// when the callback is called
+#[derive(Debug)]
 pub enum CallbackAction<'a> {
     /// Write the contents of `data` to memory at `offset`
-    WriteMemory { offset: u16, data: &'a [u8] },
+    WriteMemory { offset: usize, data: &'a [u8] },
 
     ///  Read from memory memory at `offset` to `data`
-    ReadMemory { offset: u16, data: &'a mut [u8] },
+    ReadMemory { offset: usize, data: &'a mut [u8] },
 }
 
 /// A type alias for the callback
@@ -40,6 +45,8 @@ pub type Callback = for<'a> fn(CallbackAction<'a>) -> Result<(), ()>;
 /// The transceiver implements the lowest layer of the sondbus communication protocol
 /// and handles synchronization of the communication and slave memory access.
 pub struct Transceiver<'a> {
+    physical_address: [u8; 6],
+
     /// The current state the transceiver is in
     state: State,
 
@@ -63,7 +70,12 @@ pub struct Transceiver<'a> {
     /// The current position in a buffer
     pos: u8,
 
+    mem_slave_addr: [u8; 6],
+    mem_offset: u64,
+    mem_length: u64,
+
     consequence: Consequence,
+    callback: Callback,
 }
 
 impl<'a> Transceiver<'a> {
@@ -78,6 +90,7 @@ impl<'a> Transceiver<'a> {
         callback: Callback,
     ) -> Self {
         Self {
+            physical_address,
             state: State::Idle,
             crc: CRC8Autosar::new_const(),
             cur_cmd: Command::Management(ManagementCommand::Nop),
@@ -85,7 +98,11 @@ impl<'a> Transceiver<'a> {
             sequence_no: 0,
             scratchpad,
             pos: 0,
+            mem_slave_addr: [0; 6],
+            mem_offset: 0,
+            mem_length: 0,
             consequence: Consequence::None,
+            callback,
         }
     }
 
@@ -122,10 +139,27 @@ impl<'a> Transceiver<'a> {
     fn update_crc(&mut self, v: u8) {
         self.crc.update_single(v)
     }
+
+    fn is_targeted(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
 impl<'a> Transceiver<'a> {
+    pub fn new_in_sync_sc0(
+        scratchpad: &'a mut [u8],
+        physical_address: [u8; 6],
+        callback: Callback,
+    ) -> Self {
+        let mut s = Self::new(scratchpad, physical_address, callback);
+
+        s.in_sync = true;
+        s.sequence_no = 0b11;
+
+        s
+    }
+
     pub fn t_handle_no_response(&mut self, rx: u8) {
         let old_state = self.state.clone();
         let res = self.handle(Some(rx));

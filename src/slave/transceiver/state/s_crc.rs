@@ -1,4 +1,4 @@
-use crate::{crc8::CRC, test_log};
+use crate::{crc8::CRC, slave::transceiver::CallbackAction, test_log};
 
 use super::{super::Consequence, State, Transceiver};
 
@@ -22,6 +22,16 @@ fn handle_consequence(t: &mut Transceiver) {
         Consequence::GainSync => {
             test_log!("Gained sync!");
             t.in_sync = true;
+        }
+        Consequence::WriteScratchpad => {
+            if (t.callback)(CallbackAction::WriteMemory {
+                offset: t.mem_offset as usize,
+                data: &t.scratchpad[..t.mem_length as usize],
+            })
+            .is_err()
+            {
+                t.loose_sync();
+            }
         }
     }
 }

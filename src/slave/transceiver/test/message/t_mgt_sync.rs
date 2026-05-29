@@ -1,7 +1,4 @@
-use crate::{
-    slave::transceiver::{state::State, Transceiver},
-    SYNC_SEQUENCE,
-};
+use crate::{slave::transceiver::state::State, SYNC_SEQUENCE};
 
 use super::super::new_transceiver;
 

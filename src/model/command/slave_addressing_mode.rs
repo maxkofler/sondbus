@@ -19,6 +19,17 @@ impl From<u8> for SlaveAddressingMode {
     }
 }
 
+impl SlaveAddressingMode {
+    pub fn octets(&self) -> u8 {
+        match self {
+            Self::Broadcast => 0,
+            Self::Physical => 6,
+            Self::Logical => 2,
+            Self::Virtual => 0,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::model::command::SlaveAddressingMode as DUT;

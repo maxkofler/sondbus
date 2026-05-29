@@ -1,4 +1,7 @@
-use crate::model::command::{Command, ManagementCommand};
+use crate::{
+    model::command::{Command, ManagementCommand, SlaveAddressingMode},
+    slave::transceiver::Consequence,
+};
 
 use super::{super::Transceiver, State};
 
@@ -7,8 +10,6 @@ const MASK_SEQUENCE: u8 = 0b1100_0000;
 
 pub fn state_idle(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
-        t.pos = 0;
-
         t.update_crc(rx);
 
         // Unpack the command and sequence from the received byte
@@ -38,12 +39,25 @@ pub fn state_idle(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
 
         t.cur_cmd = command.clone();
 
+        // Reset some state variables
+        t.consequence = Consequence::None;
+        t.pos = 0;
+        t.mem_length = 0;
+        t.mem_offset = 0;
+
         let state = match command {
             Command::Management(c) => match c {
                 ManagementCommand::Nop => State::CRC,
                 ManagementCommand::Sync => State::ManagementSync,
             },
-            _ => State::Idle,
+            Command::Memory(c) => match c.slave_addressing_mode {
+                SlaveAddressingMode::Broadcast | SlaveAddressingMode::Virtual => {
+                    State::MemoryOffset
+                }
+                SlaveAddressingMode::Physical | SlaveAddressingMode::Logical => {
+                    State::MemorySlaveAddress
+                }
+            },
         };
 
         // If we are NOT in sync, there is only one allowed

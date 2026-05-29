@@ -19,6 +19,17 @@ impl From<u8> for MemoryAddressingMode {
     }
 }
 
+impl MemoryAddressingMode {
+    pub fn octets(&self) -> u8 {
+        match self {
+            Self::Bits8 => 1,
+            Self::Bits16 => 2,
+            Self::Bits32 => 4,
+            Self::Bits64 => 8,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::model::command::MemoryAddressingMode as DUT;

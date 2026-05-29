@@ -7,7 +7,7 @@ pub use memory_addressing_mode::MemoryAddressingMode;
 pub use slave_addressing_mode::SlaveAddressingMode;
 
 #[repr(u8)]
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Operation {
     Read = 0,
     Write = 1,
@@ -41,6 +41,39 @@ pub enum Command {
     Memory(MemoryCommand),
 }
 
+impl Command {
+    pub fn mem_length_octets(&self) -> u8 {
+        match self {
+            Self::Memory(m) => m.memory_addressing_mode.octets(),
+            _ => 0,
+        }
+    }
+
+    pub fn mem_size_octets(&self) -> u8 {
+        match self {
+            Self::Memory(m) => m.memory_addressing_mode.octets(),
+            _ => 0,
+        }
+    }
+
+    pub fn mem_address_octets(&self) -> u8 {
+        match self {
+            Self::Memory(m) => m.slave_addressing_mode.octets(),
+            _ => 0,
+        }
+    }
+
+    pub fn mem_needs_slave_address(&self) -> bool {
+        match self {
+            Self::Memory(m) => match m.slave_addressing_mode {
+                SlaveAddressingMode::Physical | SlaveAddressingMode::Logical => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+}
+
 impl TryFrom<u8> for Command {
     type Error = u8;
 
@@ -61,6 +94,20 @@ impl TryFrom<u8> for Command {
                 slave_addressing_mode: (v >> 2).into(),
                 memory_addressing_mode: v.into(),
             }))
+        }
+    }
+}
+
+impl Into<u8> for Command {
+    fn into(self) -> u8 {
+        match self {
+            Self::Management(m) => m as u8,
+            Self::Memory(m) => {
+                1 << 5
+                    | (m.operation as u8) << 4
+                    | (m.slave_addressing_mode as u8) << 2
+                    | m.memory_addressing_mode as u8
+            }
         }
     }
 }

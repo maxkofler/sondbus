@@ -1,4 +1,4 @@
-use crate::slave::transceiver::{state::State, test::new_transceiver, Transceiver};
+use crate::slave::transceiver::{state::State, test::new_transceiver};
 
 #[test]
 fn management_nop() {
