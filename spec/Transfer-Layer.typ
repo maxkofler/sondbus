@@ -63,6 +63,14 @@ The transfer layer has a fixed topology in that there is exactly one master in t
 The slaves themselves are never allowed to initiate communication on the bus by themselves without previous master activity.
 This fixed hierarchy completely eliminates the problem of collisions and removes the need for error detection and correction mechanisms, as it is easily predictable and manageable when which device can take control of the bus and talk.
 
+== Endianness
+
+This protocol sticks to the convention of using big-endian notation for multi-octet values in networking.
+This has been chosen due to the following reasons:
+
+- Compatibility with network Endianness
+- Legibility in network traces
+
 == Addressing
 
 The transfer layer supports the following addressing modes:
@@ -218,10 +226,11 @@ It can be used by the master to determine no-execution round trip times or simil
 A requirement of this message type is that no slave shall have any side-effects from receiving this message.
 
 #table(
-  columns: (6.3em, 1fr),
-  [Msg Part], [#link(<message-command>)[Command]],
-  [Octets], [1],
-  [Description], [Command],
+  columns: (6.3em, 1fr, 1fr),
+  [Msg Part], [#link(<message-command>)[Command]], [#link(<message-crc>)[CRC]],
+  [Octets], [1], [1],
+  [Initiator], [M], [M],
+  [Description], [Command], [CRC],
 )
 
 === 0x01 - Sync <management-command-sync>
@@ -233,10 +242,12 @@ The sync command is used to bring the state machine of the transceiver into the 
 ```
 
 #table(
-  columns: (6.3em, 4fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr),
+  columns: (6.3em, 3fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr),
   [Msg Part],
   [#link(<message-command>)[Command]],
   table.cell(colspan: 15, link(<message-payload>)[Payload (Hexadecimal - 0x)]),
+  [#link(<message-crc>)[CRC]],
+  [Initiator], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M],
   [Value],
   [`0b??00_0001`],
   [1F],
@@ -254,7 +265,8 @@ The sync command is used to bring the state machine of the transceiver into the 
   [D3],
   [E2],
   [F1],
-  [Description], [Command], table.cell(colspan: 15, [Sync Sequence]),
+  [?],
+  [Description], [Command], table.cell(colspan: 15, [Sync Sequence]), [CRC],
 )
 
 No slave ever responds to this command, as it is used in pure broadcast fashion to synchronize up all slaves. This command can also be repeated multiple times to ensure out-of-sync slaves re-join the network correctly.
@@ -272,17 +284,21 @@ const SYNC_SEQUENCE: [u8; 15] = [0x1F, 0x2E, 0x3D, 0x4C, 0x5B, 0x6A, 0x79, 0x88,
 The memory command set facilitates reading from and writing to a slave memory over the fabric. This is the core of this protocol suite in that is builds the foundation that is used to create the core link between the master and its slaves.
 
 #table(
-  columns: (6.3em, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr),
-  [Msg Part], [#link(<message-command>)[Command]], table.cell(colspan: 5, [#link(<message-payload>)[Payload]]),
-  [Octets], [1], [0-6], [1-8], [1-8], [1], [n],
-  [Initiator], [M], [M], [M], [M], [M], [M/S],
+  columns: (6.3em, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr),
+  [Msg Part],
+  [#link(<message-command>)[Command]],
+  table.cell(colspan: 5, [#link(<message-payload>)[Payload]]),
+  [#link(<message-crc>)[CRC]],
+  [Octets], [1], [0-6], [1-8], [1], [1], [n], [1],
+  [Initiator], [M], [M], [M], [M], [M], [M/S], [M/S],
   [Description],
-  [#link(<memory-command-set-command>)[Command]],
+  [Command],
   [#link(<memory-command-slave-address>)[Slave#linebreak()Address]],
   [#link(<memory-command-offset>)[Offset]],
   [#link(<memory-command-length>)[Length]],
   [#link(<memory-command-header-crc>)[Header#linebreak()CRC]],
   [#link(<memory-command-payload>)[Payload]],
+  [CRC],
 )
 
 === Command <memory-command-set-command>
@@ -335,7 +351,9 @@ The length of this field is dictated by the #link(<memory-command-set-memory-add
 === Length <memory-command-length>
 
 This field encodes the amount of data in octets in the slave's or virtual address space to read or write.
-The length of this field is dictated by the #link(<memory-command-set-memory-addressing-mode>)[Memory Addressing Mode] selected in the #link(<memory-command-set-command>)[Command].
+This field is fixed at 1 octet. The protocol is designed to allow a maximum of 255 octets to be transferred in one message.
+This is to ensure that the CRC can provide adequate protection against errors and to make implementations simple.
+Larger transfers can be split into multiple messages.
 
 === Header CRC <memory-command-header-crc>
 
