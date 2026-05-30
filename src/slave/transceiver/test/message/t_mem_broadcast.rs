@@ -2,7 +2,7 @@
 
 use crate::{
     model::command::{
-        Command, MemoryAddressingMode, MemoryCommand, Operation, SlaveAddressingMode,
+        CommandTemplate, MemoryAddressingMode, MemoryCommand, Operation, SlaveAddressingMode,
     },
     slave::transceiver::{state::State, CallbackAction, Transceiver},
 };
@@ -18,7 +18,7 @@ fn memory_8_w_1_broadcast() {
     let mut scratchpad = [0];
     let mut t = Transceiver::new_in_sync_sc0(&mut scratchpad, [0, 0, 0, 0, 0, 0], |a| match a {
         CallbackAction::WriteMemory { offset, data } => {
-            assert_eq!(offset, Q_OFFSET as usize);
+            assert_eq!(offset, Q_OFFSET as u64);
             assert_eq!(data.len(), Q_LEN as usize);
             assert_eq!(data[0], 0xAA);
             Ok(())
@@ -26,13 +26,13 @@ fn memory_8_w_1_broadcast() {
         a => panic!("Called unexpected action: {a:?}"),
     });
 
-    let cmd = Command::Memory(MemoryCommand {
+    let cmd = CommandTemplate::Memory(MemoryCommand {
         operation: Operation::Write,
         slave_addressing_mode: SlaveAddressingMode::Broadcast,
         memory_addressing_mode: MemoryAddressingMode::Bits8,
     });
 
-    t.t_handle_no_response(cmd.into());
+    t.t_handle_no_response(cmd.into_u8(0));
 
     assert_eq!(t.state, State::MemoryOffset);
     t.t_handle_no_response(Q_OFFSET);
@@ -46,7 +46,7 @@ fn memory_8_w_1_broadcast() {
     assert_eq!(t.state, State::MemoryRXPayload);
     t.t_handle_no_response(0xAA);
 
-    assert_eq!(t.state, State::CRC);
+    assert_eq!(t.state, State::Crc);
     t.t_handle_crc();
 
     assert_eq!(t.state, State::Idle);
@@ -64,7 +64,7 @@ fn memory_8_r_1_broadcast() {
     let mut scratchpad = [0];
     let mut t = Transceiver::new_in_sync_sc0(&mut scratchpad, [0, 0, 0, 0, 0, 0], |a| match a {
         CallbackAction::ReadMemory { offset, data } => {
-            assert_eq!(offset, Q_OFFSET as usize);
+            assert_eq!(offset, Q_OFFSET as u64);
             assert_eq!(data.len(), Q_LEN as usize);
             data[0] = 0xAA;
             Ok(())
@@ -72,13 +72,13 @@ fn memory_8_r_1_broadcast() {
         a => panic!("Called unexpected action: {a:?}"),
     });
 
-    let cmd = Command::Memory(MemoryCommand {
+    let cmd = CommandTemplate::Memory(MemoryCommand {
         operation: Operation::Read,
         slave_addressing_mode: SlaveAddressingMode::Broadcast,
         memory_addressing_mode: MemoryAddressingMode::Bits8,
     });
 
-    t.t_handle_no_response(cmd.into());
+    t.t_handle_no_response(cmd.into_u8(0));
 
     assert_eq!(t.state, State::MemoryOffset);
     t.t_handle_no_response(Q_OFFSET);
@@ -92,7 +92,7 @@ fn memory_8_r_1_broadcast() {
     assert_eq!(t.state, State::MemoryTXPayload);
     assert_eq!(t.handle(None), Some(0xAA));
 
-    assert_eq!(t.state, State::CRC);
+    assert_eq!(t.state, State::Crc);
     t.t_handle_crc();
 
     assert_eq!(t.state, State::Idle);
@@ -103,13 +103,13 @@ fn memory_8_r_1_broadcast() {
 fn memory_8_w_0_broadcast() {
     new_transceiver!(t);
 
-    let cmd = Command::Memory(MemoryCommand {
+    let cmd = CommandTemplate::Memory(MemoryCommand {
         operation: Operation::Write,
         slave_addressing_mode: SlaveAddressingMode::Broadcast,
         memory_addressing_mode: MemoryAddressingMode::Bits8,
     });
 
-    t.t_handle_no_response(cmd.into());
+    t.t_handle_no_response(cmd.into_u8(0));
 
     assert_eq!(t.state, State::MemoryOffset);
     t.t_handle_no_response(0x11);
@@ -122,7 +122,7 @@ fn memory_8_w_0_broadcast() {
 
     // There is no payload field
 
-    assert_eq!(t.state, State::CRC);
+    assert_eq!(t.state, State::Crc);
     t.t_handle_crc();
 
     assert_eq!(t.state, State::Idle);
@@ -133,13 +133,13 @@ fn memory_8_w_0_broadcast() {
 fn memory_8_r_0_broadcast() {
     new_transceiver!(t);
 
-    let cmd = Command::Memory(MemoryCommand {
+    let cmd = CommandTemplate::Memory(MemoryCommand {
         operation: Operation::Read,
         slave_addressing_mode: SlaveAddressingMode::Broadcast,
         memory_addressing_mode: MemoryAddressingMode::Bits8,
     });
 
-    t.t_handle_no_response(cmd.into());
+    t.t_handle_no_response(cmd.into_u8(0));
 
     assert_eq!(t.state, State::MemoryOffset);
     t.t_handle_no_response(0x11);
@@ -152,7 +152,7 @@ fn memory_8_r_0_broadcast() {
 
     // There is no payload field
 
-    assert_eq!(t.state, State::CRC);
+    assert_eq!(t.state, State::Crc);
     t.t_handle_crc();
 
     assert_eq!(t.state, State::Idle);

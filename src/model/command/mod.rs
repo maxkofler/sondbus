@@ -30,84 +30,96 @@ pub struct MemoryCommand {
 }
 
 #[derive(Clone)]
+#[repr(u8)]
 pub enum ManagementCommand {
     Nop = 0x00,
     Sync = 0x01,
 }
 
-#[derive(Clone)]
-pub enum Command {
+pub enum CommandTemplate {
     Management(ManagementCommand),
     Memory(MemoryCommand),
 }
 
+#[derive(Clone)]
+pub struct Command(pub u8);
+
 impl Command {
-    pub fn mem_length_octets(&self) -> u8 {
-        match self {
-            Self::Memory(m) => m.memory_addressing_mode.octets(),
-            _ => 0,
-        }
+    pub fn is_management(&self) -> bool {
+        (self.0 >> 5) == 0
     }
 
-    pub fn mem_size_octets(&self) -> u8 {
-        match self {
-            Self::Memory(m) => m.memory_addressing_mode.octets(),
-            _ => 0,
-        }
+    pub fn is_memory(&self) -> bool {
+        !self.is_management()
     }
 
-    pub fn mem_address_octets(&self) -> u8 {
-        match self {
-            Self::Memory(m) => m.slave_addressing_mode.octets(),
-            _ => 0,
-        }
-    }
-
-    pub fn mem_needs_slave_address(&self) -> bool {
-        match self {
-            Self::Memory(m) => match m.slave_addressing_mode {
-                SlaveAddressingMode::Physical | SlaveAddressingMode::Logical => true,
-                _ => false,
-            },
-            _ => false,
-        }
-    }
-}
-
-impl TryFrom<u8> for Command {
-    type Error = u8;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        let v = value & 0b11_1111;
-
-        if (v & 1 << 5) == 0 {
-            // Management command
-            match v {
-                0x00 => Ok(Self::Management(ManagementCommand::Nop)),
-                0x01 => Ok(Self::Management(ManagementCommand::Sync)),
-                x => Err(x),
-            }
+    pub fn get_manangement_command(&self) -> Result<Option<ManagementCommand>, ()> {
+        if self.is_management() {
+            Ok(Some(ManagementCommand::try_from(self.0)?))
         } else {
-            // Memory command
-            Ok(Self::Memory(MemoryCommand {
-                operation: (v >> 4).into(),
-                slave_addressing_mode: (v >> 2).into(),
-                memory_addressing_mode: v.into(),
-            }))
+            Ok(None)
+        }
+    }
+
+    pub fn is_memory_read(&self) -> bool {
+        (self.0 & 1 << 4) == 0
+    }
+
+    pub fn mem_memory_addressing_bits(&self) -> u8 {
+        self.0 & 0b11
+    }
+
+    pub fn mem_slave_addressing_bits(&self) -> u8 {
+        (self.0 >> 2) & 0b11
+    }
+
+    pub fn mem_memory_addressing_octets(&self) -> u8 {
+        1 << self.mem_memory_addressing_bits()
+    }
+
+    pub fn mem_slave_address_octets(&self) -> u8 {
+        match self.mem_slave_addressing_bits() {
+            0b00 => 0,
+            0b01 => 6,
+            0b10 => 2,
+            0b11 => 0,
+            _ => unreachable!(),
         }
     }
 }
 
-impl Into<u8> for Command {
-    fn into(self) -> u8 {
+impl CommandTemplate {
+    pub fn into_u8(self, sequence_counter: u8) -> u8 {
         match self {
-            Self::Management(m) => m as u8,
-            Self::Memory(m) => {
-                1 << 5
-                    | (m.operation as u8) << 4
-                    | (m.slave_addressing_mode as u8) << 2
-                    | m.memory_addressing_mode as u8
-            }
+            Self::Management(m) => m.into_u8(sequence_counter),
+            Self::Memory(m) => m.into_u8(sequence_counter),
+        }
+    }
+}
+
+impl ManagementCommand {
+    pub fn into_u8(self, sequence_counter: u8) -> u8 {
+        ((sequence_counter & 0b11) << 6) | self as u8
+    }
+}
+
+impl MemoryCommand {
+    pub fn into_u8(self, sequence_counter: u8) -> u8 {
+        ((sequence_counter & 0b11) << 6)
+        | 1 << 5 // Memory command set
+        | (self.operation as u8) << 4
+        | (self.slave_addressing_mode as u8) << 2
+        | self.memory_addressing_mode as u8
+    }
+}
+
+impl TryFrom<u8> for ManagementCommand {
+    type Error = ();
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value & 0b1_1111 {
+            0 => Ok(Self::Nop),
+            1 => Ok(Self::Sync),
+            _ => Err(()),
         }
     }
 }

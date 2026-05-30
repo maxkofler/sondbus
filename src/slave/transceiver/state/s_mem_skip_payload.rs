@@ -8,9 +8,9 @@ pub fn state_memory_skip_payload(t: &mut Transceiver, rx: Option<u8>) -> Option<
 
         t.pos += 1;
 
-        if t.pos >= t.mem_length as u8 {
+        if t.pos >= t.mem_length {
             t.consequence = Consequence::None;
-            t.state = State::CRC;
+            t.state = State::Crc;
             t.pos = 0;
         }
     }

@@ -5,7 +5,7 @@ fn management_nop() {
     new_transceiver!(t);
 
     t.t_handle_no_response(0);
-    assert_eq!(t.state, State::CRC);
+    assert_eq!(t.state, State::Crc);
 
     t.t_handle_crc();
     assert_eq!(t.state, State::Idle);

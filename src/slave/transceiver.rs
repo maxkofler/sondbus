@@ -5,7 +5,7 @@ mod state;
 
 use super::super::crc8::{CRC8Autosar, CRC};
 
-use crate::model::command::{Command, ManagementCommand};
+use crate::model::command::Command;
 use state::State;
 
 use crate::test_log;
@@ -31,10 +31,10 @@ type StateFunction = fn(&mut Transceiver, rx: Option<u8>) -> Option<u8>;
 #[derive(Debug)]
 pub enum CallbackAction<'a> {
     /// Write the contents of `data` to memory at `offset`
-    WriteMemory { offset: usize, data: &'a [u8] },
+    WriteMemory { offset: u64, data: &'a [u8] },
 
     ///  Read from memory memory at `offset` to `data`
-    ReadMemory { offset: usize, data: &'a mut [u8] },
+    ReadMemory { offset: u64, data: &'a mut [u8] },
 }
 
 /// A type alias for the callback
@@ -72,7 +72,7 @@ pub struct Transceiver<'a> {
 
     mem_slave_addr: [u8; 6],
     mem_offset: u64,
-    mem_length: u64,
+    mem_length: u8,
 
     consequence: Consequence,
     callback: Callback,
@@ -93,7 +93,7 @@ impl<'a> Transceiver<'a> {
             physical_address,
             state: State::Idle,
             crc: CRC8Autosar::new_const(),
-            cur_cmd: Command::Management(ManagementCommand::Nop),
+            cur_cmd: Command(0),
             in_sync: false,
             sequence_no: 0,
             scratchpad,
@@ -141,7 +141,13 @@ impl<'a> Transceiver<'a> {
     }
 
     fn is_targeted(&self) -> bool {
-        true
+        let d = self.cur_cmd.mem_slave_address_octets();
+
+        match d {
+            0 => true,
+            6 => self.physical_address == self.mem_slave_addr,
+            _ => false,
+        }
     }
 }
 

@@ -13,7 +13,7 @@ pub fn state_management_sync(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> 
             }
         } else {
             t.consequence = Consequence::GainSync;
-            t.state = State::CRC;
+            t.state = State::Crc;
         }
 
         t.pos += 1;

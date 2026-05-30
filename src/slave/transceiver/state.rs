@@ -40,7 +40,7 @@ pub enum State {
     Idle,
 
     /// The transceiver waits for the closing CRC
-    CRC,
+    Crc,
 
     ManagementSync,
 

@@ -1,5 +1,5 @@
 use crate::{
-    model::command::{Command, ManagementCommand, SlaveAddressingMode},
+    model::command::{Command, ManagementCommand},
     slave::transceiver::Consequence,
 };
 
@@ -28,14 +28,7 @@ pub fn state_idle(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
         // the next one we expect
         t.sequence_no = (t.sequence_no + 1) & 0b11;
 
-        let command = match Command::try_from(command) {
-            Ok(v) => v,
-            Err(_) => {
-                t.loose_sync();
-                t.state = State::Idle;
-                return None;
-            }
-        };
+        let command = Command(command);
 
         t.cur_cmd = command.clone();
 
@@ -45,19 +38,25 @@ pub fn state_idle(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
         t.mem_length = 0;
         t.mem_offset = 0;
 
-        let state = match command {
-            Command::Management(c) => match c {
-                ManagementCommand::Nop => State::CRC,
+        let cmd = match t.cur_cmd.get_manangement_command() {
+            Err(_) => {
+                t.loose_sync();
+                t.state = State::Idle;
+                return None;
+            }
+            Ok(v) => v,
+        };
+
+        let state = if let Some(cmd) = cmd {
+            match cmd {
+                ManagementCommand::Nop => State::Crc,
                 ManagementCommand::Sync => State::ManagementSync,
-            },
-            Command::Memory(c) => match c.slave_addressing_mode {
-                SlaveAddressingMode::Broadcast | SlaveAddressingMode::Virtual => {
-                    State::MemoryOffset
-                }
-                SlaveAddressingMode::Physical | SlaveAddressingMode::Logical => {
-                    State::MemorySlaveAddress
-                }
-            },
+            }
+        } else {
+            match command.mem_slave_address_octets() {
+                0 => State::MemoryOffset,
+                _ => State::MemorySlaveAddress,
+            }
         };
 
         // If we are NOT in sync, there is only one allowed

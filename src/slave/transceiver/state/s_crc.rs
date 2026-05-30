@@ -25,7 +25,7 @@ fn handle_consequence(t: &mut Transceiver) {
         }
         Consequence::WriteScratchpad => {
             if (t.callback)(CallbackAction::WriteMemory {
-                offset: t.mem_offset as usize,
+                offset: t.mem_offset,
                 data: &t.scratchpad[..t.mem_length as usize],
             })
             .is_err()
