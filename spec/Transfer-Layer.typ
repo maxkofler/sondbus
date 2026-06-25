@@ -235,7 +235,9 @@ A requirement of this message type is that no slave shall have any side-effects 
 
 === 0x01 - Sync <management-command-sync>
 
-The sync command is used to bring the state machine of the transceiver into the *Synchronized* state. This state is required for any other operation to be enabled. The sync command consists of the command octet followed by the following hex sequence:
+The sync command is used to bring the state machine of the tap into the *Synchronized* state.
+This state is required for any other operation to be enabled.
+The sync command consists of the command octet followed by the following hex sequence:
 
 ```hex
 1F 2E 3D 4C 5B 6A 79 88 97 A6 B5 C4 D3 E2 F1
@@ -329,19 +331,31 @@ The operation bit indicates to the slave whether the operation is to read from o
 
 ==== Slave Addressing Mode <memory-command-set-slave-addressing-mode>
 
+For more infomation on the slave addressing mode, see the #link(<memory-command-slave-address>)[slave address] section.
+
 - `0b00` => *Broadcast*
-- `0b01` => *Physical* (By the MAC address of the slave)
-- `0b10` => *Logical* (By the logical address of the slave) #optional_feature()
-- `0b11` => *Virtual* using the MMUs to map physical memory to the fieldbus memory #optional_feature()
+- `0b01` => *Virtual* using the MMUs to map physical memory to the fieldbus memory #optional_feature()
+- `0b10` => *Physical* (By the MAC address of the slave)
+- `0b11` => *Logical* (By the logical address of the slave) #optional_feature()
 
 ==== Memory Addressing Mode <memory-command-set-memory-addressing-mode>
 
-- `0b00` => 8 bit offset and length
-- `0b01` => 16 bit offset and length #optional_feature()
-- `0b10` => 32 bit offset and length #optional_feature()
-- `0b11` => 64 bit offset and length #optional_feature()
+- `0b00` => 8 bit offset
+- `0b01` => 16 bit offset #optional_feature()
+- `0b10` => 32 bit offset #optional_feature()
+- `0b11` => 64 bit offset #optional_feature()
 
 === Slave Address <memory-command-slave-address>
+
+The slave address specifies which slave this message targets.
+Depending on the #link(<memory-command-set-slave-addressing-mode>)[slave addressing mode], this field can vary in length.
+
+The field has the following length depending on the mode used:
+
+- Broadcast: 0 Octets
+- Physical: 6 Octets
+- Logical: 2 Octets
+- Virtual: 0 Octets
 
 === Offset <memory-command-offset>
 
@@ -365,22 +379,35 @@ The payload field contains the data that is to be written to the memory or gets 
 
 For a write transaction, this field is filled by the Master, otherwise by the Slave.
 
-= Transceiver <transceiver>
+= Tap <tap>
 
-The transceiver is the component of the stack that is concerned with processing messages and forwarding them to the application.
+The tap is the component of the stack that is concerned with processing messages and forwarding them to the application.
+Its name stems from the similarity to old Ethernet (ThickNet) tap that would tap into the line and hook up a device to a network.
+This is true for the Transfer Layer, too, as the tap provides the connection to the network and allows the network to access the memory area of the network participant.
 
-== State Machine <transceiver-state-machine>
+== State Machine <tap-state-machine>
 
-The transceiver state machine has the following two states:
+As this protocol is designed to run on unframed media, there is the need for synchronization in order to determine whether the currently received octet can be interpreted correctly.
+This protocol solves that by using a simple state machine that syncs a tap to the network via a dedicated message.
+
+If the tap encounters a critical error, it will fall out of sync and wait for a new sync to be initiated.
+More details on how the tap handles errors is explained in #link(<tap-error-handling>)[error handling].
+
+The tap state machine has the following two states:
 
 - Out of Sync
 - In Sync
+
+== Error Handling <tap-error-handling>
 
 = Virtual Memory <virtual-memory>
 
 = Frames
 
-Frames can bundle multiple commands to increase efficiency on framed protocols. Frames are required when running the bus over Ethernet for example. In this case, the underlying layer does not allow for individual octets to be sent. To increase the efficiency on such lower layers, a frame provides a mechanism for bundling multiple commands to be shipped on one frame.
+Frames can bundle multiple commands to increase efficiency on framed protocols.
+Frames are required when running the bus over Ethernet for example.
+In this case, the underlying layer does not allow for individual octets to be sent.
+To increase the efficiency on such lower layers, a frame provides a mechanism for bundling multiple commands to be shipped on one frame.
 
 = Optional Features <optional-features>
 
