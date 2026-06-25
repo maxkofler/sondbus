@@ -77,7 +77,7 @@ The transfer layer supports the following addressing modes:
 
 - #link(<addressing-broadcast>)[Broadcast]
 - #link(<addressing-physical>)[Physical]
-- #link(<addressing-logical>)[Logical]
+- #link(<addressing-logical>)[Logical] #optional_feature()
 - #link(<addressing-virtual>)[Virtual] #optional_feature()
 
 === Broadcast <addressing-broadcast>
@@ -96,6 +96,8 @@ The logical addressing scheme allows for shorter messages.
 Logical addresses get distributed by the master to create a logical address space that is smaller than the physical address space.
 
 The logical address is a 16 bit address.
+
+This is an #optional_feature() feature.
 
 === Virtual <addressing-virtual>
 
@@ -189,7 +191,7 @@ The sequence shall cycle through the following states: `0b00`, `0b01`, `0b10`, `
 
 === Command Set Bit <command-set-bit>
 
-The `Command Set Bit` indicates which one of the two available command should be used with this command to infer how to interpret the `Command Set Specific` bits:
+The `Command Set Bit` indicates which one of the two available command sets should be used with this command to infer how to interpret the `Command Set Specific` bits:
 
 - `0` => #link(<command-management-command-set>)[Management Command Set]
 - `1` => #link(<command-memory-command-set>)[Memory Command Set]
@@ -283,7 +285,8 @@ const SYNC_SEQUENCE: [u8; 15] = [0x1F, 0x2E, 0x3D, 0x4C, 0x5B, 0x6A, 0x79, 0x88,
 
 == Memory Command Set <command-memory-command-set>
 
-The memory command set facilitates reading from and writing to a slave memory over the fabric. This is the core of this protocol suite in that is builds the foundation that is used to create the core link between the master and its slaves.
+The memory command set facilitates reading from and writing to a slave memory over the fabric.
+This is the core of this protocol suite in that is builds the foundation that is used to create the core link between the master and its slaves.
 
 #table(
   columns: (6.3em, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr),
@@ -334,7 +337,7 @@ The operation bit indicates to the slave whether the operation is to read from o
 For more infomation on the slave addressing mode, see the #link(<memory-command-slave-address>)[slave address] section.
 
 - `0b00` => *Broadcast*
-- `0b01` => *Virtual* using the MMUs to map physical memory to the fieldbus memory #optional_feature()
+- `0b01` => *Virtual* using the MMUs to map physical memory to fabric memory #optional_feature()
 - `0b10` => *Physical* (By the MAC address of the slave)
 - `0b11` => *Logical* (By the logical address of the slave) #optional_feature()
 
@@ -357,27 +360,32 @@ The field has the following length depending on the mode used:
 - Logical: 2 Octets
 - Virtual: 0 Octets
 
+For Physical and Logical addressed messages, only one slave shall react to the message.
+If multiple slaves react to a command, there must be a address collision, which can be critical.
+
 === Offset <memory-command-offset>
 
-The *Offset* field encodes the offset in the slave's or virtual address space to read or write at.
+The *Offset* field encodes the offset in the targeted address space to read or write at.
 The length of this field is dictated by the #link(<memory-command-set-memory-addressing-mode>)[Memory Addressing Mode] selected in the #link(<memory-command-set-command>)[Command].
 
 === Length <memory-command-length>
 
-This field encodes the amount of data in octets in the slave's or virtual address space to read or write.
+This field encodes the amount of data in octets in the targeted address space to read or write.
 This field is fixed at 1 octet. The protocol is designed to allow a maximum of 255 octets to be transferred in one message.
 This is to ensure that the CRC can provide adequate protection against errors and to make implementations simple.
-Larger transfers can be split into multiple messages.
+Larger transfers must be split into multiple messages.
 
 === Header CRC <memory-command-header-crc>
 
-The header CRC confirms and error-checks the fields leading up to this octet (Command, Slave Address, Offset, Length) to indicate to the slave that the operation is valid. This is especially important for read operations where the slave writes data to the system after this octet.
+The header CRC confirms and error-checks the fields leading up to this octet (Command, Slave Address, Offset, Length) to indicate to the slave that the operation is valid.This is especially important for read operations where the slave writes data to the system after this octet.
 
 === Payload <memory-command-payload>
 
 The payload field contains the data that is to be written to the memory or gets filled with the data read from the slave's memory.
 
 For a write transaction, this field is filled by the Master, otherwise by the Slave.
+
+#pagebreak()
 
 = Tap <tap>
 
@@ -398,9 +406,21 @@ The tap state machine has the following two states:
 - Out of Sync
 - In Sync
 
+The master can transition all slaves from the `Out of Sync` state to the `In Sync` using the #link(<management-command-sync>)[`sync` command].
+
 == Error Handling <tap-error-handling>
 
+#pagebreak()
+
 = Virtual Memory <virtual-memory>
+
+Virtual memory describes a concept where the fabric creates a virtual memory map that is composed of multiple memory areas of slaves.
+This concept allows the master to effectively address multiple slaves with just one single command, allowing for very efficient transfers of data by removing the overhead of additional headers when changing addressed slaves.
+
+The transfer layer is not concerned with how the mapping is handled, as that is something that is defined in higher layers of the protocol suite.
+Due to that, this command essentially behaves like a broadcast read or write on a big address space that may involve multiple slaves.
+
+#pagebreak()
 
 = Frames
 
@@ -408,6 +428,8 @@ Frames can bundle multiple commands to increase efficiency on framed protocols.
 Frames are required when running the bus over Ethernet for example.
 In this case, the underlying layer does not allow for individual octets to be sent.
 To increase the efficiency on such lower layers, a frame provides a mechanism for bundling multiple commands to be shipped on one frame.
+
+#pagebreak()
 
 = Optional Features <optional-features>
 
