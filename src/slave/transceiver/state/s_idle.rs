@@ -1,4 +1,5 @@
 use crate::{
+    crc8::CRC,
     model::command::{Command, ManagementCommand},
     slave::transceiver::Consequence,
 };
@@ -10,6 +11,7 @@ const MASK_SEQUENCE: u8 = 0b1100_0000;
 
 pub fn state_idle(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
+        t.crc.reset();
         t.update_crc(rx);
 
         // Unpack the command and sequence from the received byte
