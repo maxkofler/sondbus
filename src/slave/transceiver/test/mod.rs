@@ -1,5 +1,7 @@
 mod message;
 
+// TODO: Create a harness that keeps track of the CRC!
+
 /// Creates a new transceiver named `$name` that is already in sync and
 /// the sequence counter at 0b11, allowing the next command to use 0b00 for ease.
 macro_rules! new_transceiver {
