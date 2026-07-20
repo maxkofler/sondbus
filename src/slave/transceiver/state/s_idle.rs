@@ -11,6 +11,7 @@ const MASK_SEQUENCE: u8 = 0b1100_0000;
 
 pub fn state_idle(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
     if let Some(rx) = rx {
+        t.activity_flag |= true;
         t.crc.reset();
         t.update_crc(rx);
 

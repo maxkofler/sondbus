@@ -70,6 +70,10 @@ pub struct Transceiver<'a> {
     /// The current position in a buffer
     pos: u8,
 
+    /// The activity flag indicates that some commands
+    /// were processed since the last clear
+    activity_flag: bool,
+
     mem_slave_addr: [u8; 6],
     mem_offset: u64,
     mem_length: u8,
@@ -98,6 +102,7 @@ impl<'a> Transceiver<'a> {
             sequence_no: 0,
             scratchpad,
             pos: 0,
+            activity_flag: false,
             mem_slave_addr: [0; 6],
             mem_offset: 0,
             mem_length: 0,
@@ -134,6 +139,17 @@ impl<'a> Transceiver<'a> {
         test_log!("Transitioned from {:?} to {:?}", old_state, self.state);
 
         res
+    }
+
+    /// This function acknowledges the activity flag, returning the
+    /// last value and clearing it for detecting further bus activity.
+    ///
+    /// The activity flag indicates that a command has been processed
+    /// since the last clear.
+    pub fn clear_activity_flag(&mut self) -> bool {
+        let v = self.activity_flag;
+        self.activity_flag = false;
+        v
     }
 
     fn update_crc(&mut self, v: u8) {
