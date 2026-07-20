@@ -1,6 +1,7 @@
 //! Tests that test memory commands in broadcast mode
 
 use crate::{
+    crc8::CRC,
     model::command::{
         CommandTemplate, MemoryAddressingMode, MemoryCommand, Operation, SlaveAddressingMode,
     },
@@ -87,13 +88,13 @@ fn memory_8_r_1_broadcast() {
     t.t_handle_no_response(Q_LEN);
 
     assert_eq!(t.state, State::MemoryHeaderCRC);
-    t.t_handle_crc();
+    assert_eq!(t.state, State::MemoryHeaderCRC);
+    let crc = t.crc.finalize();
+    let res = t.handle(Some(crc));
+    assert_eq!(Some(0xAA), res);
 
-    assert_eq!(t.state, State::MemoryTXPayload);
-    assert_eq!(t.handle(None), Some(0xAA));
-
-    assert_eq!(t.state, State::Crc);
-    t.t_handle_crc();
+    assert_eq!(t.state, State::TxCrc);
+    assert!(t.handle(None).is_some());
 
     assert_eq!(t.state, State::Idle);
 }
@@ -147,13 +148,15 @@ fn memory_8_r_0_broadcast() {
     assert_eq!(t.state, State::MemoryLength);
     t.t_handle_no_response(0x0);
 
+    // When the transceiver receives the HeaderCRC,
+    // it shall respond with the CRC immediately, as there
+    // is no data to be sent
     assert_eq!(t.state, State::MemoryHeaderCRC);
-    t.t_handle_crc();
+    let crc = t.crc.finalize();
+    let res = t.handle(Some(crc));
+    assert!(res.is_some());
 
     // There is no payload field
-
-    assert_eq!(t.state, State::Crc);
-    t.t_handle_crc();
 
     assert_eq!(t.state, State::Idle);
 }
