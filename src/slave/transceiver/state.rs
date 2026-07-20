@@ -2,6 +2,8 @@ use crate::slave::transceiver::{StateFunction, Transceiver};
 
 mod s_crc;
 mod s_idle;
+mod s_tx_crc;
+
 mod s_mgt_sync;
 
 mod s_mem_header_crc;
@@ -16,9 +18,10 @@ mod s_mem_tx_payload;
 /// jumps to for the individual states.
 ///
 /// Make sure that the order is EXACTLY the same as in [State]
-const STATES: [StateFunction; 10] = [
+const STATES: [StateFunction; 11] = [
     s_idle::state_idle,
     s_crc::state_crc,
+    s_tx_crc::state_tx_crc,
     s_mgt_sync::state_management_sync,
     s_mem_slave_address::state_memory_slave_address,
     s_mem_offset::state_memory_offset,
@@ -41,6 +44,9 @@ pub enum State {
 
     /// The transceiver waits for the closing CRC
     Crc,
+
+    /// Transmit the CRC in the next cycle
+    TxCrc,
 
     ManagementSync,
 

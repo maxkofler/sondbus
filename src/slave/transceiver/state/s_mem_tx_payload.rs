@@ -10,7 +10,7 @@ pub fn state_memory_tx_payload(t: &mut Transceiver, _rx: Option<u8>) -> Option<u
     t.pos += 1;
 
     if t.pos >= t.mem_length {
-        t.state = State::Crc;
+        t.state = State::TxCrc;
         t.pos = 0;
     }
 
