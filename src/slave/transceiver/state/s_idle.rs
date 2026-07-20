@@ -14,9 +14,15 @@ pub fn state_idle(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
         t.crc.reset();
         t.update_crc(rx);
 
-        // Unpack the command and sequence from the received byte
-        let command = rx & MASK_COMMAND;
+        // If we receive a SYNC command, we update the sequence
+        // counter to the received one
         let sequence = (rx & MASK_SEQUENCE) >> 6;
+        if rx & MASK_COMMAND == 0x01 {
+            t.sequence_no = (sequence.overflowing_sub(1).0) & 0b11;
+        }
+
+        // Unpack the command and sequence from the received byte
+        let command = Command(rx & MASK_COMMAND);
 
         // If the sequence numbers don't match up and we're already
         // in sync, we've lost something and we loose sync with the bus
@@ -29,8 +35,6 @@ pub fn state_idle(t: &mut Transceiver, rx: Option<u8>) -> Option<u8> {
         // Increment the sequence number by one to
         // the next one we expect
         t.sequence_no = (t.sequence_no + 1) & 0b11;
-
-        let command = Command(command);
 
         t.cur_cmd = command.clone();
 
