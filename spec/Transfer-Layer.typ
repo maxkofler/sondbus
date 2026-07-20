@@ -241,17 +241,21 @@ The sync command is used to bring the state machine of the tap into the *Synchro
 This state is required for any other operation to be enabled.
 The sync command consists of the command octet followed by the following hex sequence:
 
+This command is a exception to most of the normal command rules in that it is the only command that is:
+- Accepted when the slave is not in sync
+- Not checked for its sequence number (The receiving slaves take on the sequence counter of this command)
+
 ```hex
 1F 2E 3D 4C 5B 6A 79 88 97 A6 B5 C4 D3 E2 F1
 ```
 
 #table(
-  columns: (6.3em, 3fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr),
+  columns: (6.3em, 3fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr),
   [Msg Part],
   [#link(<message-command>)[Command]],
-  table.cell(colspan: 15, link(<message-payload>)[Payload (Hexadecimal - 0x)]),
+  table.cell(colspan: 16, link(<message-payload>)[Payload (Hexadecimal - 0x)]),
   [#link(<message-crc>)[CRC]],
-  [Initiator], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M],
+  [Initiator], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M], [M],
   [Value],
   [`0b??00_0001`],
   [1F],
@@ -270,10 +274,14 @@ The sync command consists of the command octet followed by the following hex seq
   [E2],
   [F1],
   [?],
-  [Description], [Command], table.cell(colspan: 15, [Sync Sequence]), [CRC],
+  [?],
+  [Description], [Command], table.cell(colspan: 15, [Sync Sequence]), [Version], [CRC],
 )
 
-No slave ever responds to this command, as it is used in pure broadcast fashion to synchronize up all slaves. This command can also be repeated multiple times to ensure out-of-sync slaves re-join the network correctly.
+No slave ever responds to this command, as it is used in pure broadcast fashion to synchronize up all slaves.
+This command can also be repeated multiple times to ensure out-of-sync slaves re-join the network correctly.
+
+The `Version` field indicates the version to  be used. (TODO: Document versions)
 
 ```rust
 const SYNC_SEQUENCE: [u8; 15] = [0x1F, 0x2E, 0x3D, 0x4C, 0x5B, 0x6A, 0x79, 0x88, 0x97, 0xA6, 0xB5, 0xC4, 0xD3, 0xE2, 0xF1];
